@@ -889,6 +889,13 @@ select {
   flex-shrink: 0;
 }
 
+.page-header .curso-seccion-badge {
+  background: #e0e7ff;
+  color: #1e3a8a;
+  border: 1px solid #c7d2fe;
+  vertical-align: middle;
+}
+
 .curso-card-body {
   padding: 14px 16px;
   display: flex;
