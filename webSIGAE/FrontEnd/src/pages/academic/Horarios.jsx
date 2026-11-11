@@ -160,18 +160,27 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
   };
 
   return (
-    <div
-      style={{ position: "fixed", top: 0, left: 0, width: 300, height: "100vh", background: "#fff", boxShadow: "4px 0 28px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", animation: "slideInLeft 0.22s ease", zIndex: 990 }}
-    >
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className="horarios-drawer-backdrop"
+        style={{ zIndex: 1049 }}
+      />
+      <div
+        role="dialog"
+        aria-label="Listado de Cursos"
+        style={{ position: "fixed", top: 0, left: 0, width: "min(300px, 100vw)", height: "100dvh", background: "#fff", boxShadow: "4px 0 28px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "slideInLeft 0.22s ease", zIndex: 1050 }}
+      >
         {/* Header */}
-        <div style={{ background: "#0f172a", padding: "0.85rem 1.1rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "sticky", top: 0, zIndex: 1 }}>
+        <div style={{ background: "#0f172a", padding: "calc(0.85rem + env(safe-area-inset-top, 0px)) 1.1rem 0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "sticky", top: 0, zIndex: 1 }}>
           <div>
             <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.88rem" }}>Listado de Cursos</div>
             <div style={{ color: "#94a3b8", fontSize: "0.68rem", marginTop: 1 }}>{cursos.length} cursos — comparación de horarios</div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onRefresh} title="Actualizar" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#94a3b8", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center" }}>↺</button>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={onRefresh} title="Actualizar" aria-label="Actualizar listado" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#94a3b8", borderRadius: 6, width: 32, height: 32, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center" }}>↺</button>
+            <button onClick={onClose} title="Cerrar listado" aria-label="Cerrar listado" style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 6, width: 32, height: 32, cursor: "pointer", fontSize: "0.9rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
         </div>
 
@@ -220,6 +229,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
           })}
         </div>
       </div>
+    </>
   );
 }
 
@@ -608,7 +618,7 @@ export default function Horarios() {
       : null;
 
   return (
-    <div style={s.page}>
+    <div className="horarios-page">
       {/* Header */}
       <div style={s.header}>
         <div>
@@ -727,10 +737,10 @@ export default function Horarios() {
 
       {/* Main content */}
       {(cursoSeleccionado || esDocente) && !loading && (
-        <div style={esAdmin && cursoSeleccionado ? s.mainLayout : {}}>
+        <div className={esAdmin && cursoSeleccionado ? "horarios-main-layout" : undefined}>
           {/* Left: asignatura list (admin only) */}
           {esAdmin && cursoSeleccionado && (
-            <div style={s.asigPanel}>
+            <div className="horarios-asig-panel" style={s.asigPanel}>
               <div style={s.asigPanelHead}>
                 <span style={{ fontWeight: 700, color: "#1e3a5f", fontSize: "0.9rem" }}>
                   {colorearPor === "docente" ? "Docentes" : "Asignaturas"}
@@ -1075,12 +1085,13 @@ function VistaBloqueGrid({
         background: "#fff",
       }}
     >
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ minWidth: 660 }}>
       {/* Header row */}
-      <div style={{ display: "flex", background: "#1e3a5f" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "130px repeat(5, minmax(0, 1fr))", background: "#1e3a5f" }}>
         <div
           style={{
-            width: 130,
-            flexShrink: 0,
+            minWidth: 0,
             padding: "0.65rem 0.75rem",
             fontSize: "0.75rem",
             fontWeight: 700,
@@ -1096,7 +1107,7 @@ function VistaBloqueGrid({
           <div
             key={d}
             style={{
-              flex: 1,
+              minWidth: 0,
               textAlign: "center",
               padding: "0.65rem 0.25rem",
               fontSize: "0.78rem",
@@ -1122,7 +1133,8 @@ function VistaBloqueGrid({
           <div
             key={bloque.Bloque_Horario_Id}
             style={{
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: "130px repeat(5, minmax(0, 1fr))",
               borderTop: bi === 0 ? "none" : "1px solid #f0f0f0",
               minHeight: 56,
             }}
@@ -1130,8 +1142,7 @@ function VistaBloqueGrid({
             {/* Block label */}
             <div
               style={{
-                width: 130,
-                flexShrink: 0,
+                minWidth: 0,
                 padding: "0.5rem 0.65rem",
                 borderRight: "1px solid #e5e7eb",
                 display: "flex",
@@ -1213,7 +1224,7 @@ function VistaBloqueGrid({
                     if (canClick) onCelda(bloque.Bloque_Horario_Id, dia);
                   }}
                   style={{
-                    flex: 1,
+                    minWidth: 0,
                     borderLeft: "1px solid " + (di === 0 ? "#e5e7eb" : "#f0f0f0"),
                     padding: "4px",
                     position: "relative",
@@ -1471,6 +1482,9 @@ function VistaBloqueGrid({
           </div>
         );
       })}
+
+      </div>
+      </div>
 
       {/* Legend */}
       <div
@@ -1743,6 +1757,12 @@ function PanelForm({
 
   return (
     <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className="horarios-drawer-backdrop"
+        style={{ zIndex: 1049 }}
+      />
       {/* Panel */}
       <div style={s.panel}>
         <div style={s.panelHeader}>
@@ -2593,7 +2613,10 @@ const s = {
     borderRadius: "6px",
     border: "1px solid #93c5fd",
     fontSize: "0.9rem",
-    minWidth: 240,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: 420,
+    flex: "1 1 220px",
   },
 
   errorBanner: {
@@ -2828,18 +2851,18 @@ const s = {
     position: "fixed",
     top: 0,
     right: 0,
-    width: 420,
-    height: "100vh",
+    width: "min(420px, 100vw)",
+    height: "100dvh",
     background: "#fff",
     boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
-    zIndex: 990,
+    zIndex: 1050,
     display: "flex",
     flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },
   panelHeader: {
     background: "#0f172a",
-    padding: "1rem 1.25rem",
+    padding: "calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",

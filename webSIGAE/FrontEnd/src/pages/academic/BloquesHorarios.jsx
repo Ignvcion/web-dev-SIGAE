@@ -2034,13 +2034,13 @@ const s = {
 
   /* Panel lateral */
   panel: {
-    position: "fixed", top: 0, right: 0, width: 440, height: "100vh",
+    position: "fixed", top: 0, right: 0, width: "min(440px, 100vw)", height: "100dvh",
     background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
-    zIndex: 990, display: "flex", flexDirection: "column",
+    zIndex: 1050, display: "flex", flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },
   panelHeader: {
-    background: "#0f172a", padding: "1rem 1.25rem",
+    background: "#0f172a", padding: "calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem",
     display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
   },
   panelBtnClose: {

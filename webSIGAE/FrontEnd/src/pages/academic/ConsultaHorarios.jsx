@@ -38,7 +38,7 @@ function fechaLegible(f) {
 // Criterios en grilla compacta: varias columnas en escritorio, una en móvil
 const ESTILO_FORM = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(190px, 100%), 1fr))",
   gap: "10px",
   alignItems: "center",
   marginBottom: "16px",

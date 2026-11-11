@@ -2994,3 +2994,332 @@ button.btn-enlace:disabled {
   border-color: #fecaca;
   color: #991b1b;
 }
+
+
+/* ==========================================================================
+   PWA & RESPONSIVE MÓVIL (SIGAE)
+   Orden por pantalla: Login → Dashboard → Horarios → Citaciones
+   ========================================================================== */
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* clip evita scroll horizontal sin desactivar position: sticky en grillas */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Prevención de zoom automático en iOS Safari (<16px) y ergonomía móvil */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not(.campo-codigo),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .mobile-topbar {
+    height: calc(56px + var(--sat));
+    padding: var(--sat) max(16px, var(--sar)) 0 max(12px, var(--sal));
+  }
+
+  .mobile-menu-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .main-content {
+    padding-top: calc(72px + var(--sat));
+  }
+
+  .usuarios-container {
+    padding: 8px 4px;
+  }
+
+  .usuarios-header h1 {
+    font-size: 1.45rem;
+  }
+
+  /* Pantallas Dashboard */
+  .dashboard-container {
+    padding: 8px 4px;
+  }
+
+  .dashboard-container h1 {
+    font-size: 1.45rem;
+  }
+
+  .quick-actions,
+  .nav-sections {
+    margin-top: 24px;
+  }
+
+  .actions-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .actions-grid a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+
+  .nav-sections-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .nav-group-links a {
+    min-height: 42px;
+  }
+}
+
+/* Pantalla 1: Login, activación por código, recuperar contraseña y selección de rol */
+@media (max-width: 480px) {
+  .main-content {
+    padding-top: calc(68px + var(--sat));
+  }
+
+  .login-container {
+    padding: 16px;
+    min-height: 100dvh;
+  }
+
+  .login-form {
+    padding: 24px 18px;
+    border-radius: 12px;
+    gap: 14px;
+  }
+
+  .login-logo-img {
+    max-width: 220px;
+  }
+
+  .login-form h1 {
+    font-size: 1.4rem;
+  }
+
+  .login-form button:not(.btn-enlace),
+  .role-button {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  input.campo-codigo {
+    width: 100%;
+    font-size: 20px;
+    letter-spacing: 6px;
+  }
+
+  .select-role-container {
+    min-height: 100dvh;
+    padding: 16px;
+  }
+
+  .select-role-card {
+    padding: 24px 18px;
+    border-radius: 14px;
+  }
+
+  .select-role-logo {
+    max-width: 220px;
+  }
+
+  /* Dashboard métricas en 2 columnas compactas */
+  .dashboard-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .card {
+    padding: 14px 12px;
+    border-radius: 12px;
+    min-width: 0;
+  }
+
+  .card h3 {
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+
+  .card p {
+    font-size: 1.5rem;
+    margin: 0;
+  }
+}
+
+/* Pantalla 3: Horarios (Creador Horario, Horario Maestro y Consulta de Horarios) */
+.horarios-page {
+  padding: 1.75rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.horarios-main-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.horarios-main-layout > * {
+  min-width: 0;
+}
+
+.horarios-drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .horarios-main-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .horarios-asig-panel {
+    min-height: 0 !important;
+  }
+
+  .horarios-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+  }
+
+  /* En pantallas angostas los paneles flotan encima sin aplastar la grilla */
+  body.horarios-panel-open .main-content,
+  body.horarios-listado-open .main-content,
+  body.bloques-panel-open .main-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .horarios-page {
+    padding: 6px 2px;
+  }
+
+  .hm-th-bloque,
+  .hm-td-bloque {
+    min-width: 92px !important;
+    padding: 0.45rem 0.4rem !important;
+  }
+}
+
+/* Pantalla 4: Citaciones, filtros y modales compartidos */
+.cit-form-fila > *,
+.campo-pwd {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 12px;
+    padding-top: calc(64px + var(--sat));
+    padding-bottom: max(20px, var(--sab));
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .modal-card,
+  .modal-card.modal-card-ancho {
+    padding: 20px 16px;
+    max-height: calc(100dvh - 84px - var(--sat));
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions button {
+    flex: 1 1 120px;
+    min-height: 44px;
+  }
+
+  .usuarios-filtros {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .usuarios-search,
+  .usuarios-select,
+  .usuarios-filtros--en-linea > select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cit-header .acciones-grupo {
+    width: 100%;
+  }
+
+  .cit-header .acciones-grupo > * {
+    flex: 1 1 150px;
+    justify-content: center;
+    text-align: center;
+    min-height: 44px;
+  }
+
+  .cit-panel {
+    padding: 14px 12px;
+  }
+
+  .cit-pendiente-item button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .cit-tabs {
+    width: 100%;
+  }
+
+  .cit-tabs .btn-vista {
+    flex: 1 1 auto;
+    text-align: center;
+    min-height: 40px;
+  }
+
+  .cit-card-motivo {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .cit-acciones-detalle {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cit-acciones-detalle .acciones-grupo {
+    width: 100%;
+  }
+
+  .cit-acciones-detalle .acciones-grupo button {
+    flex: 1 1 140px;
+    min-height: 42px;
+  }
+
+  .cit-select-auto {
+    width: 100%;
+  }
+
+  .cit-stat {
+    flex: 1 1 110px;
+    min-width: 0;
+  }
+}
