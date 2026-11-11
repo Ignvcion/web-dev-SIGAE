@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { apiUrl, appPath } from "../../services/api";
 
 export const AuthContext = createContext();
 
@@ -29,7 +30,7 @@ function redirectToSessionExpired() {
   localStorage.removeItem("usuario");
   localStorage.removeItem("token");
   localStorage.removeItem("rolActivo");
-  window.location.href = "/session-expired";
+  window.location.href = appPath("/session-expired");
 }
 
 export function AuthProvider({ children }) {
@@ -79,7 +80,7 @@ export function AuthProvider({ children }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     // Invalidar sesión en el servidor (fire-and-forget, no bloquear UI si falla)
     if (currentToken) {
-      fetch("/api/auth/logout", {
+      fetch(apiUrl("/auth/logout"), {
         method: "POST",
         headers: { Authorization: `Bearer ${currentToken}` },
       }).catch(() => {});

@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
+import { BASE_URL, apiUrl } from "../../services/api";
 
-const API = "/api/bloques";
+const API = `${BASE_URL}/bloques`;
 
 const JORNADAS     = ["Mañana", "Tarde"];
 const TIPOS_BLOQUE = ["Clase", "Recreo"];
@@ -1560,7 +1561,7 @@ function SuspenderJornadaModal({ onClose, onExito }) {
     setDetalle("");
     setEnviando(true);
     try {
-      const res = await fetch("/api/horarios/suspender-jornada", {
+      const res = await fetch(apiUrl("/horarios/suspender-jornada"), {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(form),

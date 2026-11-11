@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   filtrarHorarios,
@@ -313,9 +314,9 @@ function ConsultaHorarios() {
                         <td>
                           {/* Los electivos (CU106) se gestionan en la pantalla de Electivos */}
                           {Number(h.electivo) === 1 ? (
-                            <a href="/electivos" style={{ fontSize: "0.85rem", color: "#5b21b6", fontWeight: 600 }}>
+                            <Link to="/electivos" style={{ fontSize: "0.85rem", color: "#5b21b6", fontWeight: 600 }}>
                               Ver en Electivos
-                            </a>
+                            </Link>
                           ) : (
                             <button
                               type="button"

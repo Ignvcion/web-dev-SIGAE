@@ -1,5 +1,35 @@
 // src/services/api.js
-const BASE_URL = '/api';
+export const BASE_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
+
+// Origen del servidor para archivos (/uploads/...) cuando VITE_API_URL apunta a otro host
+const ASSET_ORIGIN = /^https?:\/\//i.test(BASE_URL)
+  ? (BASE_URL.endsWith('/api') ? BASE_URL.slice(0, -4) : BASE_URL)
+  : '';
+
+export function apiUrl(path = '') {
+  if (/^https?:\/\//i.test(path)) return path;
+  const clean = String(path || '');
+  if (clean === '/api' || clean === '/api/') return BASE_URL;
+  if (clean.startsWith('/api/')) return `${BASE_URL}${clean.slice(4)}`;
+  return `${BASE_URL}${clean.startsWith('/') ? '' : '/'}${clean}`;
+}
+
+export function resolveAssetUrl(url) {
+  if (!url) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const clean = String(url);
+  if (ASSET_ORIGIN) {
+    return `${ASSET_ORIGIN}${clean.startsWith('/') ? '' : '/'}${clean}`;
+  }
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  if (clean.startsWith('/uploads')) return `${base}${clean.slice(1)}`;
+  return clean;
+}
+
+export function appPath(path = '') {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  return `${base}${String(path).replace(/^\/+/, '')}`;
+}
 
 function getToken() {
   return localStorage.getItem('token');
@@ -16,12 +46,12 @@ function clearSessionAndRedirect() {
   localStorage.removeItem('usuario');
   localStorage.removeItem('token');
   localStorage.removeItem('rolActivo');
-  window.location.href = '/session-expired';
+  window.location.href = appPath('/session-expired');
 }
 
 export async function apiFetch(url, options = {}) {
   const token = getToken();
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,

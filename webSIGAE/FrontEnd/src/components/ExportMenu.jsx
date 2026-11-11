@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiUrl } from "../services/api";
 
 /* ── Export helpers (CU60-62) ─────────────────────────────────── */
 function authHeadersGet() {
@@ -6,7 +7,7 @@ function authHeadersGet() {
 }
 
 async function descargarArchivo(url, nombreArchivo) {
-  const res = await fetch(url, { headers: authHeadersGet() });
+  const res = await fetch(apiUrl(url), { headers: authHeadersGet() });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Error al exportar el horario");

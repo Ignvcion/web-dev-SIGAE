@@ -4,11 +4,12 @@ import { useAuth } from "../context/AuthContext";
 import { validarRut, normalizarRut } from "../../utils/validaciones";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
+import { apiUrl } from "../../services/api";
 
 const ESPERA_ENTRE_ENVIOS = 60;
 
 async function postJSON(url, body) {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -85,7 +86,7 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      const { res, data } = await postJSON("/api/auth/login", { rut, password });
+      const { res, data } = await postJSON("/auth/login", { rut, password });
 
       if (res.status === 401) {
         const msg = data.error || "";
@@ -125,7 +126,7 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      const { res, data } = await postJSON("/api/auth/activacion/verificar", { desafio, codigo });
+      const { res, data } = await postJSON("/auth/activacion/verificar", { desafio, codigo });
       if (res.status === 401 || res.status === 409) {
         volverACredenciales(data.error || "Inicia sesión de nuevo.");
         return;
@@ -147,7 +148,7 @@ function Login() {
     setReenviando(true);
     setError("");
     try {
-      const { res, data } = await postJSON("/api/auth/activacion/reenviar", { desafio });
+      const { res, data } = await postJSON("/auth/activacion/reenviar", { desafio });
       if (res.status === 429 && data.segundos) {
         setEspera(data.segundos);
         setError(data.error);

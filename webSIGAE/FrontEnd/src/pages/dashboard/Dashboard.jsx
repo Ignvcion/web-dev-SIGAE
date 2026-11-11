@@ -111,7 +111,7 @@ function DashboardAdmin({ esSuperAdmin }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/dashboard/stats")
+    apiFetch("/dashboard/stats")
       .then((r) => {
         if (!r || !r.ok) throw new Error();
         return r.json();

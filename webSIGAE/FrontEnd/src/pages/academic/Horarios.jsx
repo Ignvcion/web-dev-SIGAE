@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import useColores from "../../hooks/useColores";
 import { PuntoColor } from "../../components/SelectorColor";
 import { tonosDesdeHex } from "../../utils/colores";
@@ -8,9 +9,9 @@ import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
-import { getElectivosDeCurso } from "../../services/api";
+import { BASE_URL, apiUrl, getElectivosDeCurso } from "../../services/api";
 
-const API = "/api";
+const API = BASE_URL;
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 const DIAS_ABR = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
@@ -146,8 +147,8 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
     try {
       const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
       const [rH, rA] = await Promise.all([
-        fetch(`/api/horarios?curso_id=${cursoId}&incluir_eliminadas=1`, { headers: h }).then(r => r.json()),
-        fetch(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`, { headers: h }).then(r => r.json()),
+        fetch(apiUrl(`/horarios?curso_id=${cursoId}&incluir_eliminadas=1`), { headers: h }).then(r => r.json()),
+        fetch(apiUrl(`/horarios/asignaturas-curso?curso_id=${cursoId}`), { headers: h }).then(r => r.json()),
       ]);
       const colorMap = {};
       (Array.isArray(rA) ? rA : []).forEach((a, i) => {
@@ -918,7 +919,7 @@ export default function Horarios() {
             {electivosCurso.length > 0 && (
               <p style={{ margin: "0 0 0.6rem", fontSize: "0.8rem", color: "#5b21b6" }}>
                 Los bloques morados son electivos de 3° y 4° medio, compartidos por todos esos cursos; se gestionan en{" "}
-                <a href="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</a>.
+                <Link to="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</Link>.
               </p>
             )}
             <VistaBloqueGrid
@@ -1722,7 +1723,7 @@ function PanelForm({
 
   useEffect(() => {
     if (!consulta) return;
-    fetch(`/api/horarios/docentes-disponibles?${consulta}`, { headers: authHeaders() })
+    fetch(apiUrl(`/horarios/docentes-disponibles?${consulta}`), { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         // CU56: el servidor indica si alguna especialidad (etiqueta) coincide con la asignatura;

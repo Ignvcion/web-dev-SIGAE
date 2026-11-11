@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../../services/api";
 import {
   getMisJefaturas,
   getSituaciones,
@@ -36,7 +37,7 @@ function SituacionFinal() {
     (async () => {
       try {
         if (esAdmin) {
-          const res = await fetch("/api/cursos", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+          const res = await fetch(apiUrl("/cursos"), { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
           const lista = await res.json();
           const vigente = lista.length ? lista.map((c) => c.Curso_Periodo_Lectivo).sort()[0] : null;
           setCursos(lista.filter((c) => c.Curso_Periodo_Lectivo === vigente));

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   DIAS_SEMANA, COLORES_ASIGNATURA, COLOR_PENDIENTE, aMinutos, hhmm, minutosAHHMM, detectarTopes,
 } from "../../utils/horarios";
+import { apiUrl } from "../../services/api";
 
 const COLORES = COLORES_ASIGNATURA;
 const COLOR_INACTIVO = { bg: "#f3f4f6", border: "#d1d5db", text: "#6b7280" };
@@ -15,8 +16,8 @@ const COLOR_RECREO = { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" };
 // grilla para reflejar siempre la configuración actual; null si no hay parámetros.
 function cargarJornada() {
   const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
-  const pedir = (url) => fetch(url, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  return Promise.all([pedir("/api/bloques/parametros"), pedir("/api/bloques")]).then(([param, bloques]) => {
+  const pedir = (url) => fetch(apiUrl(url), { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  return Promise.all([pedir("/bloques/parametros"), pedir("/bloques")]).then(([param, bloques]) => {
     if (!param?.Parametro_Institucional_Inicio_Jornada) return null;
     return {
       inicio: aMinutos(param.Parametro_Institucional_Inicio_Jornada),

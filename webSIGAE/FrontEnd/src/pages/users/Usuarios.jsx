@@ -100,7 +100,7 @@ const cambiarEstadoCuenta = async (u) => {
 
   setLoadingToggle(true);
   try {
-    const res = await apiFetch(`/api/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
+    const res = await apiFetch(`/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
     if (!res) return;
     const data = await res.json();
     if (!res.ok) alert(data.mensaje || "Error al cambiar estado");

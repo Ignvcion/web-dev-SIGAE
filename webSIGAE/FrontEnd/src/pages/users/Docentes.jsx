@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getDocentes, getEspecialidades, actualizarEspecialidadesDocente } from "../../services/api";
+import { apiUrl, getDocentes, getEspecialidades, actualizarEspecialidadesDocente } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import SelectorColor from "../../components/SelectorColor";
 import { fijarColor } from "../../hooks/useColores";
@@ -126,7 +126,7 @@ function Docentes() {
     fijar(color);
     setAviso("");
     try {
-      const res = await fetch(`/api/colores/docentes/${d.Usuario_Id}`, {
+      const res = await fetch(apiUrl(`/colores/docentes/${d.Usuario_Id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify({ color }),

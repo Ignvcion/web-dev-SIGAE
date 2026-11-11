@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
 import { getEstadoPeriodo } from "../../services/promocion";
+import { apiUrl } from "../../services/api";
 import BarraFiltrosCursos, { tramoDelCurso, TRAMOS_CURSO } from "../../components/cursos/BarraFiltrosCursos";
 
 function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
@@ -15,7 +16,7 @@ function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const res = await fetch(`/api/cursos/${curso.Curso_Id}/asignaturas/disponibles`, {
+        const res = await fetch(apiUrl(`/cursos/${curso.Curso_Id}/asignaturas/disponibles`), {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -62,7 +63,7 @@ function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
 
     setEnviando(true);
     try {
-      const res = await fetch(`/api/cursos/${curso.Curso_Id}/asignaturas`, {
+      const res = await fetch(apiUrl(`/cursos/${curso.Curso_Id}/asignaturas`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -152,7 +153,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
 
   // Pide las asignaturas del curso; el estado cambia solo al llegar la respuesta.
   const pedir = () =>
-    fetch(`/api/cursos/${curso.Curso_Id}/asignaturas`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(apiUrl(`/cursos/${curso.Curso_Id}/asignaturas`), { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) setError(data.error || "Error al cargar");
@@ -268,8 +269,8 @@ function Cursos() {
   // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
   const cargarDatos = () =>
     Promise.all([
-      fetch("/api/cursos", { headers: { Authorization: `Bearer ${token}` } }),
-      fetch("/api/cursos/niveles", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(apiUrl("/cursos"), { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(apiUrl("/cursos/niveles"), { headers: { Authorization: `Bearer ${token}` } }),
     ])
       .then(async ([resCursos, resNiveles]) => {
         const lista = await resCursos.json();
@@ -313,7 +314,7 @@ function Cursos() {
       return;
     }
 
-    const res = await fetch("/api/cursos", {
+    const res = await fetch(apiUrl("/cursos"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

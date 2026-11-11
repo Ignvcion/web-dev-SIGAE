@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarEstudiante, verificarRutEstudiante } from "../../services/api";
+import { apiUrl, registrarEstudiante, verificarRutEstudiante } from "../../services/api";
 import { validarRut, normalizarRut, validarDireccion } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
 import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
@@ -27,7 +27,7 @@ function RegisterStudent() {
   const [rutVerificado, setRutVerificado] = useState({ rut: null, existe: false });
 
   useEffect(() => {
-    fetch("/api/cursos", {
+    fetch(apiUrl("/cursos"), {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
       .then((res) => res.json())

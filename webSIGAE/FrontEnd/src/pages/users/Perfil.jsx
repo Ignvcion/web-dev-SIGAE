@@ -5,7 +5,7 @@ import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
 import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
-import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
+import { apiFetch, apiUrl, resolveAssetUrl, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil } from "../../services/api";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
 import { validarTelefonoChileno, validarDireccion, formatearDireccion, COLUMNAS_DIRECCION_ESTUDIANTE, MENSAJE_TELEFONO } from "../../utils/validaciones";
@@ -88,7 +88,7 @@ function Perfil() {
 
   useEffect(() => {
     if (!idObjetivo) return;
-    apiFetch(`/api/usuarios/${idObjetivo}`)
+    apiFetch(`/usuarios/${idObjetivo}`)
       .then(async (r) => {
         if (!r) return; // sesión expirada: apiFetch ya redirigió
         const data = await r.json().catch(() => ({}));
@@ -173,7 +173,7 @@ function Perfil() {
   };
 
   const recargarDatos = () => {
-    apiFetch(`/api/usuarios/${idObjetivo}`)
+    apiFetch(`/usuarios/${idObjetivo}`)
       .then((r) => {
         if (!r || !r.ok) throw new Error(`HTTP ${r?.status}`);
         return r.json();
@@ -233,7 +233,7 @@ function Perfil() {
     setEnviando(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/auth/cambiar-contrasena", {
+      const res = await fetch(apiUrl("/auth/cambiar-contrasena"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -466,7 +466,7 @@ function Perfil() {
         <div className="perfil-card perfil-card--identidad">
           <div className="perfil-identidad">
             <img
-              src={previewFoto || datos?.Usuario_Foto_Perfil || FOTO_PERFIL_PLACEHOLDER}
+              src={previewFoto || resolveAssetUrl(datos?.Usuario_Foto_Perfil) || FOTO_PERFIL_PLACEHOLDER}
               alt="Fotografía de perfil"
               className="perfil-identidad-foto"
             />
@@ -686,7 +686,7 @@ function Perfil() {
             <h2>Fotografía de Perfil</h2>
             <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
               <img
-                src={previewFoto || datos?.Usuario_Foto_Perfil || FOTO_PERFIL_PLACEHOLDER}
+                src={previewFoto || resolveAssetUrl(datos?.Usuario_Foto_Perfil) || FOTO_PERFIL_PLACEHOLDER}
                 alt="Vista previa de la fotografía"
                 style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
               />

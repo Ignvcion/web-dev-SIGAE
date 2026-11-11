@@ -41,26 +41,26 @@ export async function descargarArchivo(url, nombrePorDefecto) {
 }
 
 // ── RF60: profesor jefe (CU95, CU96) y estudiantes del curso (CU97) ──
-export const getDocentesActivos = () => json("GET", "/api/horarios/docentes");
-export const designarProfesorJefe = (cursoId, cuerpo) => json("PUT", `/api/cursos/${cursoId}/profesor-jefe`, cuerpo);
-export const retirarProfesorJefe = (cursoId, cuerpo = {}) => json("DELETE", `/api/cursos/${cursoId}/profesor-jefe`, cuerpo);
-export const getEstudiantesDeCurso = (cursoId) => json("GET", `/api/cursos/${cursoId}/estudiantes`);
-export const getMisJefaturas = () => json("GET", "/api/cursos/mis-jefaturas");
+export const getDocentesActivos = () => json("GET", "/horarios/docentes");
+export const designarProfesorJefe = (cursoId, cuerpo) => json("PUT", `/cursos/${cursoId}/profesor-jefe`, cuerpo);
+export const retirarProfesorJefe = (cursoId, cuerpo = {}) => json("DELETE", `/cursos/${cursoId}/profesor-jefe`, cuerpo);
+export const getEstudiantesDeCurso = (cursoId) => json("GET", `/cursos/${cursoId}/estudiantes`);
+export const getMisJefaturas = () => json("GET", "/cursos/mis-jefaturas");
 // CU105: ruta de formación de estudiantes de 2°, 3° y 4° medio
 export const asignarRutaFormacion = (cursoId, estudianteIds, ruta) =>
-  json("PUT", `/api/cursos/${cursoId}/ruta-formacion`, { estudianteIds, ruta });
+  json("PUT", `/cursos/${cursoId}/ruta-formacion`, { estudianteIds, ruta });
 
 // ── RF61: situación final (CU98, CU99) y promoción (CU100) ──
-export const getSituaciones = (cursoId) => json("GET", `/api/promocion/cursos/${cursoId}/situaciones`);
+export const getSituaciones = (cursoId) => json("GET", `/promocion/cursos/${cursoId}/situaciones`);
 export const registrarSituaciones = (cursoId, situaciones, confirmar) =>
-  json("PUT", `/api/promocion/cursos/${cursoId}/situaciones`, { situaciones, confirmar });
+  json("PUT", `/promocion/cursos/${cursoId}/situaciones`, { situaciones, confirmar });
 export const descargarPlantilla = (cursoId) =>
-  descargarArchivo(`/api/promocion/cursos/${cursoId}/plantilla`, "situacion_final.xlsx");
+  descargarArchivo(`/promocion/cursos/${cursoId}/plantilla`, "situacion_final.xlsx");
 
 export async function cargarExcel(cursoId, archivo, confirmar) {
   const datos = new FormData();
   datos.append("archivo", archivo);
-  const res = await apiFetch(`/api/promocion/cursos/${cursoId}/situaciones/excel${confirmar ? "?confirmar=true" : ""}`, {
+  const res = await apiFetch(`/promocion/cursos/${cursoId}/situaciones/excel${confirmar ? "?confirmar=true" : ""}`, {
     method: "POST",
     body: datos,
   });
@@ -70,10 +70,10 @@ export async function cargarExcel(cursoId, archivo, confirmar) {
   return data;
 }
 
-export const promoverCurso = (cursoId, cuerpo) => json("POST", `/api/promocion/cursos/${cursoId}/promover`, cuerpo);
+export const promoverCurso = (cursoId, cuerpo) => json("POST", `/promocion/cursos/${cursoId}/promover`, cuerpo);
 
 // ── Cambio de período ──
-export const getEstadoPeriodo = () => json("GET", "/api/promocion/periodos/estado");
-export const iniciarCierre = () => json("POST", "/api/promocion/periodos/iniciar-cierre", {});
-export const descargarRespaldo = () => descargarArchivo("/api/promocion/periodos/respaldo", "respaldo_cambio_periodo.xlsx");
-export const iniciarNuevoPeriodo = () => json("POST", "/api/promocion/periodos/iniciar-nuevo", { confirmarRespaldo: true });
+export const getEstadoPeriodo = () => json("GET", "/promocion/periodos/estado");
+export const iniciarCierre = () => json("POST", "/promocion/periodos/iniciar-cierre", {});
+export const descargarRespaldo = () => descargarArchivo("/promocion/periodos/respaldo", "respaldo_cambio_periodo.xlsx");
+export const iniciarNuevoPeriodo = () => json("POST", "/promocion/periodos/iniciar-nuevo", { confirmarRespaldo: true });
