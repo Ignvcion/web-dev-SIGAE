@@ -57,49 +57,77 @@ function Estudiantes() {
 
   // CU39: editar asociaciones (apoderado) sin modificar los datos personales
   const [apoderadosOpciones, setApoderadosOpciones] = useState([]);
+  const [errorApoderados, setErrorApoderados] = useState("");
   // RF57 / CU90: titular y hasta 4 suplentes (incluye el flujo de CU39)
   const [editandoAsociacion, setEditandoAsociacion] = useState(null);
   const [msgExitoAsociacion, setMsgExitoAsociacion] = useState("");
 
-  // CU34 y CU35: listado con filtros opcionales de curso y estado académico, resueltos en el backend
+  const cargarApoderados = () =>
+    getApoderados()
+      .then((data) => {
+        setErrorApoderados("");
+        setApoderadosOpciones(Array.isArray(data) ? data : (data?.apoderados || []));
+      })
+      .catch((error) => setErrorApoderados(error.message || "No fue posible cargar la lista de apoderados"));
+
   // Pide el listado; el estado cambia solo al llegar la respuesta (callbacks), así el efecto
-  // de montaje no provoca renders en cascada. cargarEstudiantes() además limpia los avisos.
-  const pedirEstudiantes = (filtros, esInicial = false) =>
-    getEstudiantes(filtros)
+  // de montaje no provoca renders en cascada.
+  const pedirEstudiantesInicial = () =>
+    getEstudiantes({})
       .then((data) => {
         if (Array.isArray(data)) {
           setEstudiantes(data);
           // Las opciones de los selects se fijan solo en la carga inicial (sin filtros),
           // para que no se reduzcan a medida que se aplican filtros posteriores.
-          if (esInicial) {
-            setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
-            // El filtro ofrece siempre todos los estados (CU35, CU37) y además cualquier otro presente
-            const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
-            setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
-          }
+          setCursosDisponibles([...new Set(data.map((e) => e.Curso_Nombre).filter(Boolean))].sort());
+          const presentes = data.map((e) => e.Estudiante_Estado_Academico).filter(Boolean);
+          setEstadosDisponibles([...new Set([...ESTADOS_ACADEMICOS, ...presentes])]);
         } else {
-          // Excepciones: sin estudiantes registrados / sin coincidencias / docente sin cursos asignados
           setEstudiantes(data.estudiantes || []);
           setMensajeInfo(data.mensaje || "No hay estudiantes registrados.");
         }
       })
-      // Error técnico en la consulta
       .catch((error) => setErrorCarga(error.message || "No fue posible recuperar los registros"))
       .finally(() => setLoading(false));
 
-  // CU34 y CU35: listado con filtros opcionales de curso y estado académico, resueltos en el backend
-  const cargarEstudiantes = (filtros, esInicial = false) => {
+  // Consulta unificada (CU34, CU35, CU36): combina búsqueda por criterio con filtros activos
+  // para que la tabla coincida siempre con los controles visibles en pantalla.
+  const consultarEstudiantes = async ({ curso = "", estado = "", criterio = "" } = {}) => {
     setLoading(true);
     setErrorCarga("");
     setMensajeInfo("");
-    return pedirEstudiantes(filtros, esInicial);
+    const crit = criterio.trim();
+    try {
+      const data = crit
+        ? await buscarEstudiantes(crit)
+        : await getEstudiantes({ curso, estado });
+      if (Array.isArray(data)) {
+        const filtrados = data.filter((e) =>
+          (!curso || e.Curso_Nombre === curso)
+          && (!estado || e.Estudiante_Estado_Academico === estado)
+        );
+        setEstudiantes(filtrados);
+        if (filtrados.length === 0) {
+          setMensajeInfo("No se encontraron estudiantes que coincidan con el criterio y los filtros aplicados.");
+        }
+      } else {
+        setEstudiantes(data.estudiantes || []);
+        setMensajeInfo(
+          data.mensaje || (crit ? "No se encontraron estudiantes con el criterio ingresado" : "No hay estudiantes registrados.")
+        );
+      }
+    } catch (error) {
+      setErrorCarga(error.message || "No fue posible completar la consulta, reintente más tarde");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    pedirEstudiantes({}, true);
+    pedirEstudiantesInicial();
     if (esAdmin) {
-      getCursos().then(setCursosOpciones).catch(() => {});
-      getApoderados().then((data) => setApoderadosOpciones(Array.isArray(data) ? data : [])).catch(() => {});
+      getCursos().then((data) => setCursosOpciones(Array.isArray(data) ? data : [])).catch(() => {});
+      cargarApoderados();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -111,36 +139,21 @@ function Estudiantes() {
     }));
   };
 
-  const aplicarFiltros = () => cargarEstudiantes({ curso: filtroCurso, estado: filtroEstado });
+  const aplicarFiltros = () =>
+    consultarEstudiantes({ curso: filtroCurso, estado: filtroEstado, criterio: busqueda });
 
   const limpiarFiltros = () => {
     setBusqueda("");
     setFiltroCurso("");
     setFiltroEstado("");
-    cargarEstudiantes({});
+    consultarEstudiantes({});
   };
 
-  // CU36: búsqueda por nombre completo o RUT, resuelta en el backend (independiente del filtro de CU35)
-  const buscarPorCriterio = async () => {
-    setLoading(true);
-    setErrorCarga("");
-    setMensajeInfo("");
-    try {
-      const data = await buscarEstudiantes(busqueda);
-      if (Array.isArray(data)) {
-        setEstudiantes(data);
-      } else {
-        // Excepciones: sin coincidencias / docente sin cursos asignados
-        setEstudiantes(data.estudiantes || []);
-        setMensajeInfo(data.mensaje || "No se encontraron estudiantes con el criterio ingresado");
-      }
-    } catch (error) {
-      // Excepciones: criterio vacío o solo espacios / error técnico
-      setErrorCarga(error.message || "No fue posible completar la consulta, reintente más tarde");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const buscarPorCriterio = () =>
+    consultarEstudiantes({ curso: filtroCurso, estado: filtroEstado, criterio: busqueda });
+
+  const recargarVistaActual = () =>
+    consultarEstudiantes({ curso: filtroCurso, estado: filtroEstado, criterio: busqueda });
 
   // El filtro por curso/estado y la búsqueda por criterio ya los resuelve el backend (CU35/CU36)
   const estudiantesFiltrados = [...estudiantes].sort((a, b) => {
@@ -185,6 +198,11 @@ function Estudiantes() {
       }
     }
 
+    if (!form.Curso_Id) {
+      setMsgErrorForm("Selecciona un curso asociado");
+      return;
+    }
+
     setGuardando(true);
     try {
       const data = await editarEstudiante(editando.Estudiante_Id, {
@@ -197,7 +215,7 @@ function Estudiantes() {
       });
       // CU38 - Excepción "Sin modificaciones": el backend responde sin objeto "estudiante"
       setMsgExitoForm(data.mensaje || "Ficha actualizada correctamente");
-      await cargarEstudiantes({ curso: filtroCurso, estado: filtroEstado });
+      await recargarVistaActual();
     } catch (error) {
       // CU38 - Excepción "Curso no existe o inactivo"
       setMsgErrorForm(error.message || "No fue posible actualizar la ficha");
@@ -215,7 +233,7 @@ function Estudiantes() {
   const alGuardarAsociacion = async (mensaje) => {
     setEditandoAsociacion(null);
     setMsgExitoAsociacion(mensaje);
-    await cargarEstudiantes({ curso: filtroCurso, estado: filtroEstado });
+    await recargarVistaActual();
   };
 
   if (loading) {
@@ -235,11 +253,11 @@ function Estudiantes() {
 
       {/* CU36: búsqueda por nombre completo o RUT */}
       <form
-        className="usuarios-filtros"
+        className="usuarios-filtros estudiantes-search-bar"
         onSubmit={(e) => { e.preventDefault(); buscarPorCriterio(); }}
       >
         <input
-          type="text"
+          type="search"
           className="usuarios-search"
           placeholder="Buscar por nombre o RUT..."
           value={busqueda}
@@ -249,8 +267,9 @@ function Estudiantes() {
       </form>
 
       {/* CU35: filtro por curso y estado académico */}
-      <div className="usuarios-filtros">
+      <div className="usuarios-filtros estudiantes-filtros-bar">
         <select
+          aria-label="Filtrar por curso"
           className="usuarios-select"
           value={filtroCurso}
           onChange={(e) => setFiltroCurso(e.target.value)}
@@ -261,6 +280,7 @@ function Estudiantes() {
           ))}
         </select>
         <select
+          aria-label="Filtrar por estado académico"
           className="usuarios-select"
           value={filtroEstado}
           onChange={(e) => setFiltroEstado(e.target.value)}
@@ -270,12 +290,14 @@ function Estudiantes() {
             <option key={estado} value={estado}>{estado}</option>
           ))}
         </select>
-        <button type="button" className="btn-roles" onClick={aplicarFiltros}>
-          Filtrar
-        </button>
-        <button type="button" className="btn-roles" onClick={limpiarFiltros}>
-          Limpiar
-        </button>
+        <div className="estudiantes-filtros-acciones">
+          <button type="button" className="btn-roles" onClick={aplicarFiltros}>
+            Filtrar
+          </button>
+          <button type="button" className="btn-roles" onClick={limpiarFiltros}>
+            Limpiar
+          </button>
+        </div>
       </div>
 
       {msgExitoAsociacion && (
@@ -300,77 +322,80 @@ function Estudiantes() {
           {estudiantesFiltrados.length === 0 ? (
             <div className="usuarios-empty">No se encontraron estudiantes</div>
           ) : (
-            <table className="tabla-usuarios">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_Nombre_Completo")}>
-                    Nombre{flechaOrden("Estudiante_Nombre_Completo")}
-                  </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_RUT")}>
-                    RUT{flechaOrden("Estudiante_RUT")}
-                  </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Curso_Nombre")}>
-                    Curso{flechaOrden("Curso_Nombre")}
-                  </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_Estado_Academico")}>
-                    Estado{flechaOrden("Estudiante_Estado_Academico")}
-                  </th>
-                  <th>Dirección</th>
-                  {esAdmin && <th>Acciones</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {estudiantesFiltrados.map((e, idx) => (
-                  <tr key={e.Estudiante_Id}>
-                    <td>{idx + 1}</td>
-                    <td>{e.Estudiante_Nombre_Completo}</td>
-                    <td>{e.Estudiante_RUT}</td>
-                    <td>{e.Curso_Nombre}</td>
-                    <td>
-                      {e.Estudiante_Estado_Academico === "Regular" ? (
-                        <span className="badge-activo">Regular</span>
-                      ) : (
-                        <span className="badge-inactivo">{e.Estudiante_Estado_Academico}</span>
-                      )}
-                    </td>
-                    <td>{formatearDireccion(e, COLUMNAS_DIRECCION_ESTUDIANTE) || "—"}</td>
-                    {esAdmin && (
-                      <td>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          <button className="btn-roles" onClick={() => abrirEdicion(e)}>
-                            Editar ficha
-                          </button>
-                          <button className="btn-roles" onClick={() => abrirEdicionAsociacion(e)}>
-                            Apoderados
-                          </button>
-                        </div>
-                      </td>
-                    )}
+            <div className="tabla-responsive-container tabla-responsive-container--cards">
+              <table className="tabla-usuarios tabla-estudiantes">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_Nombre_Completo")}>
+                      Nombre{flechaOrden("Estudiante_Nombre_Completo")}
+                    </th>
+                    <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_RUT")}>
+                      RUT{flechaOrden("Estudiante_RUT")}
+                    </th>
+                    <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Curso_Nombre")}>
+                      Curso{flechaOrden("Curso_Nombre")}
+                    </th>
+                    <th style={{ cursor: "pointer" }} onClick={() => alternarOrden("Estudiante_Estado_Academico")}>
+                      Estado{flechaOrden("Estudiante_Estado_Academico")}
+                    </th>
+                    <th>Dirección</th>
+                    {esAdmin && <th>Acciones</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {estudiantesFiltrados.map((e, idx) => (
+                    <tr key={e.Estudiante_Id}>
+                      <td data-label="#" className="est-col-num">{idx + 1}</td>
+                      <td data-label="Nombre" className="est-col-nombre">{e.Estudiante_Nombre_Completo}</td>
+                      <td data-label="RUT">{e.Estudiante_RUT}</td>
+                      <td data-label="Curso">{e.Curso_Nombre}</td>
+                      <td data-label="Estado" className="est-col-estado">
+                        {e.Estudiante_Estado_Academico === "Regular" ? (
+                          <span className="badge-activo">Regular</span>
+                        ) : (
+                          <span className="badge-inactivo">{e.Estudiante_Estado_Academico}</span>
+                        )}
+                      </td>
+                      <td data-label="Dirección">{formatearDireccion(e, COLUMNAS_DIRECCION_ESTUDIANTE) || "—"}</td>
+                      {esAdmin && (
+                        <td data-label="Acciones" className="est-col-acciones">
+                          <div className="acciones-grupo est-acciones">
+                            <button type="button" className="btn-roles" onClick={() => abrirEdicion(e)}>
+                              Editar ficha
+                            </button>
+                            <button type="button" className="btn-roles" onClick={() => abrirEdicionAsociacion(e)}>
+                              Apoderados
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}
 
       {/* CU38: modal de edición de curso asociado y estado académico */}
       {editando && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div className="form-card" style={{ width: "460px", maxWidth: "95vw" }}>
-            <h2 style={{ marginBottom: "4px" }}>Editar ficha del estudiante</h2>
-            <p style={{ color: "#64748b", marginBottom: "20px" }}>
+        <div className="modal-overlay">
+          <div className="modal-card" role="dialog" aria-labelledby="titulo-editar-ficha">
+            <div className="modal-header">
+              <h2 id="titulo-editar-ficha">Editar ficha del estudiante</h2>
+              <button
+                type="button"
+                className="btn-cerrar"
+                onClick={cerrarEdicion}
+                aria-label="Cerrar"
+                disabled={guardando}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="modal-subtitulo">
               <strong>{editando.Estudiante_Nombre_Completo}</strong>
             </p>
 
@@ -434,17 +459,17 @@ function Estudiantes() {
               {msgExitoForm && <div className="msg-exito">{msgExitoForm}</div>}
               {msgErrorForm && <div className="msg-error-form">{msgErrorForm}</div>}
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                <button type="submit" className="btn-primario" disabled={guardando}>
-                  {guardando ? "Guardando..." : "Guardar cambios"}
-                </button>
+              <div className="modal-actions">
                 <button
                   type="button"
-                  className="btn-desactivar"
+                  className="btn-secondary"
                   onClick={cerrarEdicion}
                   disabled={guardando}
                 >
                   Cancelar
+                </button>
+                <button type="submit" className="btn-primario" disabled={guardando}>
+                  {guardando ? "Guardando..." : "Guardar cambios"}
                 </button>
               </div>
             </form>
@@ -457,6 +482,8 @@ function Estudiantes() {
         <ApoderadosEstudianteModal
           estudiante={editandoAsociacion}
           apoderados={apoderadosOpciones}
+          errorApoderados={errorApoderados}
+          onRecargarApoderados={cargarApoderados}
           onClose={() => setEditandoAsociacion(null)}
           onGuardado={alGuardarAsociacion}
         />
