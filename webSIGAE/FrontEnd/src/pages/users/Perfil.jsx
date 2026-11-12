@@ -690,11 +690,12 @@ function Perfil() {
                 alt="Vista previa de la fotografía"
                 style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
               />
-              <form style={{ display: "flex", flexDirection: "column", gap: "10px" }} onSubmit={handleSubirFoto}>
+              <form style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: 0, maxWidth: "100%", flex: "1 1 200px" }} onSubmit={handleSubirFoto}>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleSeleccionArchivo}
+                  style={{ maxWidth: "100%", width: "100%" }}
                 />
                 {msgExitoFoto && <div className="msg-exito">{msgExitoFoto}</div>}
                 {msgErrorFoto && <div className="msg-error-form">{msgErrorFoto}</div>}

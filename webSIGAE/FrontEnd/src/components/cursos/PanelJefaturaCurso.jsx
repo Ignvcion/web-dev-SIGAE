@@ -140,7 +140,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
 
       {esAdmin && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-          <select value={docenteId} onChange={(e) => setDocenteId(e.target.value)} style={{ minWidth: "16rem", maxWidth: "100%" }}>
+          <select value={docenteId} onChange={(e) => setDocenteId(e.target.value)} style={{ minWidth: "min(16rem, 100%)", maxWidth: "100%" }}>
             <option value="">Seleccionar docente...</option>
             {docentes.map((d) => (
               <option key={d.Usuario_Id} value={d.Usuario_Id}>{d.Usuario_Nombre_Completo}</option>

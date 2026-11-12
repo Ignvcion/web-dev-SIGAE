@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // Descripción de cada perfil para ayudar a elegir con cuál ingresar
@@ -25,8 +25,7 @@ function SelectRole() {
   };
 
   if (!usuario) {
-
-    return <div className="select-role-container"><p>Cargando...</p></div>;
+    return <Navigate to="/" replace />;
   }
 
   return (

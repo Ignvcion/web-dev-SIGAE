@@ -367,7 +367,8 @@ function Apoderados() {
       {!errorCarga && !mensajeInfo && apoderadosFiltrados.length === 0 ? (
         <div className="usuarios-empty">No se encontraron apoderados registrados</div>
       ) : !errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
+        <div className="tabla-responsive-container">
+          <table className="tabla-usuarios">
           <thead>
             <tr>
               <th>#</th>
@@ -416,8 +417,9 @@ function Apoderados() {
                 )}
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* ── MODAL ── */}

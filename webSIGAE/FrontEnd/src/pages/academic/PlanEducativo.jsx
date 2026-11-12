@@ -40,7 +40,8 @@ function TablaAsignaturas({ asignaturas }) {
     return <p className="empty-state-text">Este plan no tiene asignaturas registradas.</p>;
   }
   return (
-    <table className="tabla-asignaturas">
+    <div className="tabla-responsive-container">
+      <table className="tabla-asignaturas">
       <thead>
         <tr>
           <th>Asignatura</th>
@@ -62,8 +63,9 @@ function TablaAsignaturas({ asignaturas }) {
             <td>{a.Horas_Semanales_Requeridas}h</td>
           </tr>
         ))}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -279,7 +281,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Nuevo Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -453,7 +455,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Editar Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -647,7 +649,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
         ))}
       </select>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem", marginTop: "1rem" }}>
         <div>
           <label>Nuevo Periodo Lectivo</label>
           <input

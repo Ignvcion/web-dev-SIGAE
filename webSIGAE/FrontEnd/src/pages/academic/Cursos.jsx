@@ -206,7 +206,8 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
           <p>Este curso no tiene asignaturas asociadas aún.</p>
         </div>
       ) : (
-        <table className="tabla-asignaturas">
+        <div className="tabla-responsive-container">
+          <table className="tabla-asignaturas">
           <thead>
             <tr>
               <th>Asignatura</th>
@@ -226,8 +227,9 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {mostrarModal && (

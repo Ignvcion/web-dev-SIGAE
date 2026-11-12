@@ -103,8 +103,11 @@
 
 .disp-semanal .disp-tramo {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 3px 4px 3px 8px;
   border: 1px solid #86efac;
   border-radius: 8px;
@@ -119,6 +122,8 @@
 }
 
 .disp-semanal .disp-tramo input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
   padding: 2px 4px;
   border: 1px solid #bbf7d0;
   border-radius: 6px;
@@ -274,6 +279,7 @@
 /* Duraciones sugeridas de un tramo (horario de atención: 1 hora, 2 horas) */
 .disp-semanal .disp-duraciones {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 3px;
   margin-left: 2px;
 }

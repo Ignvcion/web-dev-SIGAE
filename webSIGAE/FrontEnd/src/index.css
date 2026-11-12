@@ -11,6 +11,11 @@ body {
   background: #f3f4f6;
 }
 
+input[type="file"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* LOGIN */
 
 .login-container {
@@ -1297,7 +1302,7 @@ select {
    disponible; "dense" rellena los huecos con las tarjetas pequeñas */
 .perfil-bento {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   grid-auto-flow: row dense;
   gap: 24px;
   align-items: start;
@@ -1333,9 +1338,19 @@ select {
 }
 
 /* Celular: dos columnas; correo y dirección a lo ancho para no cortar el texto */
-@container (max-width: 371px) {
+@container (min-width: 280px) and (max-width: 371px) {
   .perfil-grid.perfil-grid--fluida {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .perfil-campo--doble {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (max-width: 279px) {
+  .perfil-grid.perfil-grid--fluida {
+    grid-template-columns: 1fr;
   }
 
   .perfil-campo--doble {
@@ -1439,10 +1454,6 @@ select {
   .perfil-bento {
     grid-template-columns: 1fr;
   }
-
-  .perfil-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .perfil-header {
@@ -1498,6 +1509,13 @@ select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+@media (max-width: 520px) {
+  .perfil-bento,
+  .perfil-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .perfil-campo {
@@ -3689,7 +3707,9 @@ body {
   background: white;
 }
 
-.tabla-responsive-container .tabla-usuarios {
+.tabla-responsive-container .tabla-usuarios,
+.tabla-responsive-container .tabla-asignaturas,
+.tabla-responsive-container .tabla-cursos {
   width: 100%;
   margin-bottom: 0;
   box-shadow: none;
@@ -3805,7 +3825,7 @@ body {
     text-align: center;
   }
 
-  .cit-tabla-wrap {
+  .cit-tabla-wrap:has(.cit-tabla-historial) {
     background: transparent;
     box-shadow: none;
     overflow: visible;

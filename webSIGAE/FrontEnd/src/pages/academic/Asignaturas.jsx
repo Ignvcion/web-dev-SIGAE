@@ -340,7 +340,8 @@ function Asignaturas() {
           <p>{asignaturas.length === 0 ? "No hay asignaturas registradas aún." : "Sin resultados para la búsqueda o el tramo elegido."}</p>
         </div>
       ) : (
-        <table className="tabla-asignaturas">
+        <div className="tabla-responsive-container">
+          <table className="tabla-asignaturas">
           <thead>
             <tr>
               <th>#</th>
@@ -387,8 +388,9 @@ function Asignaturas() {
                 )}
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#94a3b8" }}>
