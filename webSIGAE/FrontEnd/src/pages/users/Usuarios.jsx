@@ -220,11 +220,11 @@ const cambiarEstadoCuenta = async (u) => {
           </thead>
           <tbody>
             {usuariosFiltrados.map((u, idx) => {
-              const esMismoUsuario = u.Usuario_Id === usuario?.id;
+              const esMismoUsuario = Number(u.Usuario_Id) === Number(usuario?.id);
               const esSuperAdminFila = u.Administrador_Tipo === "Super Admin";
 
               return (
-                <tr key={u.Usuario_Id}>
+                <tr key={u.Usuario_Id || u.Usuario_RUT || idx}>
                   <td>{idx + 1}</td>
                   <td>{u.Usuario_Nombre_Completo}</td>
                   <td>{u.Usuario_RUT}</td>
