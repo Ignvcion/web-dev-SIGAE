@@ -553,11 +553,15 @@ select {
     line-height: 1;
     cursor: pointer;
     padding: 4px 8px;
+    flex-shrink: 0;
   }
 
   .mobile-topbar-logo {
-    height: 32px;
+    height: 36px;
     width: auto;
+    max-width: calc(100% - 60px);
+    object-fit: contain;
+    flex-shrink: 0;
   }
 
   .sidebar {
