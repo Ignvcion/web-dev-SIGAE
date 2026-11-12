@@ -64,6 +64,36 @@ function minutosInicioTramo(tramo) {
   return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
 }
 
+function minutosAhora() {
+  const ahora = new Date();
+  return ahora.getHours() * 60 + ahora.getMinutes();
+}
+
+// Fin del tramo en minutos ("09:00 - 09:45" -> 585); si solo hay hora de inicio, usa esa hora
+export function minutosFinTramo(c) {
+  const tramo = String(c?.Citacion_Tramo_Horario || "");
+  const rango = /(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/.exec(tramo);
+  if (rango) return Number(rango[3]) * 60 + Number(rango[4]);
+  if (c?.Citacion_Hora_Fin) {
+    const fin = /^(\d{1,2}):(\d{2})/.exec(String(c.Citacion_Hora_Fin));
+    if (fin) return Number(fin[1]) * 60 + Number(fin[2]);
+  }
+  const ini = /^(\d{1,2}):(\d{2})/.exec(tramo || String(c?.Citacion_Hora_Inicio || ""));
+  return ini ? Number(ini[1]) * 60 + Number(ini[2]) : null;
+}
+
+// True cuando la citación pertenece a una fecha anterior a hoy o su tramo horario de hoy ya terminó
+export function yaPasoCitacion(c) {
+  const fecha = fechaISO(c?.Citacion_Fecha);
+  if (!fecha) return false;
+  const hoy = hoyISO();
+  if (fecha < hoy) return true;
+  if (fecha > hoy) return false;
+  const finMin = minutosFinTramo(c);
+  if (finMin === null) return false;
+  return finMin <= minutosAhora();
+}
+
 export function ordenarCronologicamente(citaciones, ascendente = true) {
   const factor = ascendente ? 1 : -1;
   return [...citaciones].sort((a, b) => {
@@ -86,7 +116,9 @@ export const CATEGORIAS_AGENDA = [
 export function categoriaCitacion(c) {
   if (esCancelada(c)) return "cancelada";
   if (esPendiente(c)) return "pendiente";
-  if (esConfirmada(c)) return fechaISO(c.Citacion_Fecha) >= hoyISO() ? "futura" : "confirmada";
+  if (esConfirmada(c) || String(c?.Citacion_Estado || "").trim().toLowerCase() === "futura") {
+    return !yaPasoCitacion(c) ? "futura" : "confirmada";
+  }
   return "pendiente";
 }
 
@@ -101,16 +133,16 @@ export function etiquetaCategoria(c) {
   return ETIQUETAS_CATEGORIA[categoriaCitacion(c)];
 }
 
-// Una citación admite cancelación o reprogramación mientras no esté cancelada ni haya pasado su fecha
+// Una citación admite cancelación o reprogramación mientras no esté cancelada ni haya pasado su fecha/hora
 export function esEditable(c) {
-  return !esCancelada(c) && fechaISO(c.Citacion_Fecha) >= hoyISO();
+  return !esCancelada(c) && !yaPasoCitacion(c);
 }
 
 // CU75/CU77: tras una reprogramación la confirmación le corresponde a la contraparte.
 // El backend informa Puede_Confirmar para el usuario actual; si no viene, se deduce del rol
 // asumiendo el flujo base (el apoderado confirma).
 export function puedeConfirmar(c, rol) {
-  if (!esPendiente(c)) return false;
+  if (!esPendiente(c) || yaPasoCitacion(c)) return false;
   if (typeof c.Puede_Confirmar === "boolean") return c.Puede_Confirmar;
   const responsable = c.Requiere_Confirmacion_De || "Apoderado";
   return responsable === rol;
@@ -132,6 +164,10 @@ export function validarFechaTramo({ fecha = "", tramo = "" }) {
 
   if (!tramo) errores.tramo = "El tramo horario es obligatorio";
   else if (!TRAMOS_HORARIOS.includes(tramo)) errores.tramo = "Tramo horario inválido";
+  else if (fecha === hoyISO()) {
+    const ini = minutosInicioTramo(tramo);
+    if (ini <= minutosAhora()) errores.tramo = "El tramo horario seleccionado ya pasó";
+  }
   return errores;
 }
 

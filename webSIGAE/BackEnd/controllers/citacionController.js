@@ -35,6 +35,36 @@ function hoyISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function minutosAhora() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function minutosTramo(tramo) {
+  const txt = String(tramo || '');
+  const rango = /(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/.exec(txt);
+  if (rango) {
+    return {
+      inicio: Number(rango[1]) * 60 + Number(rango[2]),
+      fin: Number(rango[3]) * 60 + Number(rango[4]),
+    };
+  }
+  const m = /^(\d{1,2}):(\d{2})/.exec(txt.trim());
+  if (!m) return null;
+  const inicio = Number(m[1]) * 60 + Number(m[2]);
+  return { inicio, fin: inicio };
+}
+
+function yaPasoCitacion(fecha, tramo) {
+  if (!fecha) return false;
+  const hoy = hoyISO();
+  if (fecha < hoy) return true;
+  if (fecha > hoy) return false;
+  const rango = minutosTramo(tramo);
+  if (!rango) return false;
+  return rango.fin <= minutosAhora();
+}
+
 function esFechaValida(fecha) {
   if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
   const [y, m, d] = fecha.split('-').map(Number);
@@ -58,6 +88,12 @@ function validarFechaTramo(fecha, tramo) {
 
   if (!tramo) errores.tramo = 'El tramo horario es obligatorio';
   else if (!TRAMOS_HORARIOS.includes(tramo)) errores.tramo = 'Tramo horario inválido';
+  else if (fecha === hoyISO()) {
+    const rango = minutosTramo(tramo);
+    if (rango && rango.inicio <= minutosAhora()) {
+      errores.tramo = 'El tramo horario seleccionado ya pasó';
+    }
+  }
   return errores;
 }
 
@@ -140,7 +176,9 @@ function formatearCitacion(fila, userId) {
   }
   const responsableId = requiere === 'Docente' ? citacion.Docente_Usuario_Id : citacion.Apoderado_Usuario_Id;
   const puedeConfirmar =
-    requiere !== null && citacion.Citacion_Fecha >= hoyISO() && Number(responsableId) === Number(userId);
+    requiere !== null &&
+    !yaPasoCitacion(citacion.Citacion_Fecha, citacion.Citacion_Tramo_Horario) &&
+    Number(responsableId) === Number(userId);
   return { ...citacion, Requiere_Confirmacion_De: requiere, Puede_Confirmar: puedeConfirmar };
 }
 
@@ -233,7 +271,12 @@ const getCitacionesPendientes = async (req, res) => {
     );
     const pendientes = rows
       .map((fila) => formatearCitacion(fila, req.user.id))
-      .filter((c) => c.Requiere_Confirmacion_De === (rol === 'Apoderado' ? 'Apoderado' : 'Docente') && c.Puede_Confirmar);
+      .filter(
+        (c) =>
+          c.Requiere_Confirmacion_De === (rol === 'Apoderado' ? 'Apoderado' : 'Docente') &&
+          c.Puede_Confirmar &&
+          !yaPasoCitacion(c.Citacion_Fecha, c.Citacion_Tramo_Horario)
+      );
 
     // Excepción 1: no existen citaciones pendientes
     if (pendientes.length === 0) {
@@ -384,8 +427,13 @@ const confirmarCitacion = async (req, res) => {
     if (!esPendiente(citacion)) {
       return res.status(409).json({ mensaje: 'La citación no se encuentra pendiente de confirmación' });
     }
-    if (citacion.Citacion_Fecha < hoyISO()) {
-      return res.status(409).json({ mensaje: 'La fecha de la citación ya pasó; no puede confirmarse' });
+    if (yaPasoCitacion(citacion.Citacion_Fecha, citacion.Citacion_Tramo_Horario)) {
+      return res.status(409).json({
+        mensaje:
+          citacion.Citacion_Fecha < hoyISO()
+            ? 'La fecha de la citación ya pasó; no puede confirmarse'
+            : 'El horario de la citación ya pasó; no puede confirmarse',
+      });
     }
     // Confirmar es aceptar la asistencia: solo la contraparte que corresponde, nunca un tercero
     // (ni siquiera un administrador en nombre de otro).
@@ -446,7 +494,7 @@ const cancelarCitacion = async (req, res) => {
   try {
     const citacion = await buscarCitacionDelUsuario(req.params.id, req.user);
     // Excepción 1: la citación seleccionada no existe o no está disponible
-    if (!citacion || esCancelada(citacion) || citacion.Citacion_Fecha < hoyISO()) {
+    if (!citacion || esCancelada(citacion) || yaPasoCitacion(citacion.Citacion_Fecha, citacion.Citacion_Tramo_Horario)) {
       return res.status(404).json({ mensaje: 'La citación seleccionada no existe o no está disponible' });
     }
 
@@ -500,7 +548,7 @@ const reprogramarCitacion = async (req, res) => {
   try {
     const citacion = await buscarCitacionDelUsuario(req.params.id, req.user);
     // Excepción 1: la citación no existe o no está disponible para edición
-    if (!citacion || esCancelada(citacion) || citacion.Citacion_Fecha < hoyISO()) {
+    if (!citacion || esCancelada(citacion) || yaPasoCitacion(citacion.Citacion_Fecha, citacion.Citacion_Tramo_Horario)) {
       return res.status(404).json({
         mensaje: 'La citación seleccionada no existe o no está disponible para edición',
       });

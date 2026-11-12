@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
@@ -9,6 +9,8 @@ import {
   formatearFecha,
   hoyISO,
   ordenarCronologicamente,
+  puedeConfirmar,
+  yaPasoCitacion,
 } from "../../utils/citaciones";
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
 import FormCitacionModal from "../../components/citaciones/FormCitacionModal";
@@ -72,7 +74,7 @@ function Citaciones() {
 
   // CU78 pasos 1–4 (agenda) y CU75 getCitacionesPendientes(): se consultan juntas y el estado
   // se actualiza solo al recibir la respuesta
-  const aplicarResultado = ({ agenda, pendientes: pend }) => {
+  const aplicarResultado = useCallback(({ agenda, pendientes: pend }) => {
     if (agenda.error) {
       // CU78 - Excepción 2: error al recuperar la información
       setErrorCarga(agenda.error);
@@ -84,7 +86,9 @@ function Citaciones() {
       // CU78 - Excepción 1: no existen citaciones asociadas al usuario
       setMensajeVacio(validas.length === 0 ? agenda.mensaje || "No existen citaciones asociadas a tu cuenta." : "");
     }
-    const pendientesValidas = ordenarCronologicamente(pend.lista.filter(esConsistente));
+    const pendientesValidas = ordenarCronologicamente(
+      pend.lista.filter((c) => esConsistente(c) && !yaPasoCitacion(c) && puedeConfirmar(c, rolAgenda))
+    );
     setPendientes(pendientesValidas);
     // CU75 - Excepción 1: no existen citaciones pendientes
     setMsgPendientes(
@@ -94,13 +98,13 @@ function Citaciones() {
           : "")
     );
     setCargando(false);
-  };
+  }, [rolAgenda]);
 
   useEffect(() => {
     let activo = true;
     consultarCitaciones(rolAgenda).then((resultado) => activo && aplicarResultado(resultado));
     return () => { activo = false; };
-  }, [rolAgenda]);
+  }, [rolAgenda, aplicarResultado]);
 
   // Recarga tras una acción (crear, confirmar, cancelar, reprogramar) o al reintentar
   const recargar = () => {

@@ -478,4 +478,30 @@ describe('Pruebas Unitarias - CU74–CU79: Módulo de Citaciones', () => {
     expect(res.json).toHaveBeenCalledWith({ mensaje: 'No fue posible recuperar el historial de citaciones' });
     console.error.mockRestore();
   });
+
+  test('CU75: una citación del día de hoy cuyo tramo ya terminó no aparece en pendientes ni permite confirmar', async () => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const hoyStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    jest.useFakeTimers().setSystemTime(new Date(`${hoyStr}T23:17:00`));
+    try {
+      req.user = { id: 4, roles: ['Apoderado'] };
+      req.query.rol = 'Apoderado';
+      pool.query.mockResolvedValueOnce([[filaCitacion({ Citacion_Fecha: hoyStr, Citacion_Tramo_Horario: '17:30 - 18:00' })]]);
+
+      await citacionController.getCitacionesPendientes(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ citaciones: [] }));
+
+      req.params.id = '50';
+      pool.query.mockResolvedValueOnce([[filaCitacion({ Citacion_Fecha: hoyStr, Citacion_Tramo_Horario: '17:30 - 18:00' })]]);
+      await citacionController.confirmarCitacion(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(pool.getConnection).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

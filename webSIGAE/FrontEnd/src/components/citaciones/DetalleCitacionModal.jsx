@@ -79,9 +79,8 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
     setMsgError("");
   };
 
-  // CU75: confirmar citación pendiente
+  // CU75: confirmar citación pendiente sin diálogo nativo window.confirm (compatible con PWA/WebView móvil)
   const handleConfirmar = async () => {
-    if (!window.confirm("¿Confirmas tu asistencia a esta citación?")) return;
     setProcesando(true);
     setMsgError("");
     try {
@@ -231,7 +230,7 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
               <p className="cit-nota">
                 {esCancelada(citacion)
                   ? "La citación está cancelada y no admite modificaciones."
-                  : "La fecha de esta citación ya pasó; no está disponible para edición."}
+                  : "La fecha y horario de esta citación ya pasaron; no está disponible para edición."}
               </p>
             )}
 
@@ -243,7 +242,7 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                 Ver historial del estudiante
               </Link>
               <div className="acciones-grupo">
-                {puedeConfirmar(citacion, rol) && fechaISO(citacion.Citacion_Fecha) >= hoyISO() && (
+                {puedeConfirmar(citacion, rol) && esEditable(citacion) && (
                   <button type="button" className="btn-reactivar" onClick={handleConfirmar} disabled={procesando}>
                     {procesando ? "Confirmando..." : "Confirmar citación"}
                   </button>
