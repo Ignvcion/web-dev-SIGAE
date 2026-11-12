@@ -69,7 +69,7 @@ function ApoderadosEstudianteModal({
   const idsSuplentes = suplentes.map((s) => String(s.Usuario_Id));
   const opcionesTitular = candidatosTitular.filter((a) => !idsSuplentes.includes(String(a.Usuario_Id)));
   const opcionesSuplente = activos.filter(
-    (a) => String(a.Usuario_Id) !== titularId && !idsSuplentes.includes(String(a.Usuario_Id))
+    (a) => String(a.Usuario_Id) !== String(titularId) && !idsSuplentes.includes(String(a.Usuario_Id))
   );
 
   const cambiarTitular = (id) => {
