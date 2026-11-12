@@ -41,9 +41,11 @@ function calcDuracion(inicio, fin) {
 }
 
 function sumarMinutos(horaHHMM, minutos) {
-  if (!horaHHMM || !minutos) return "";
+  const mins = Number(minutos);
+  if (!horaHHMM || !Number.isFinite(mins) || mins <= 0) return "";
   const [h, m] = horaHHMM.split(":").map(Number);
-  const total = h * 60 + (m || 0) + minutos;
+  if (!Number.isFinite(h)) return "";
+  const total = h * 60 + (m || 0) + mins;
   if (total >= 24 * 60) return "";
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
@@ -184,7 +186,12 @@ export default function BloquesHorarios() {
 
       {/* Contenido */}
       <div style={s.tabContent}>
-        {tab === "parametros" && <TabParametros onJornadaCambiada={() => { abrirConflictos(); recargarBloques(); }} />}
+        {tab === "parametros" && (
+          <TabParametros
+            onJornadaCambiada={abrirConflictos}
+            onParametrosGuardados={recargarBloques}
+          />
+        )}
         {tab === "bloques"    && (
           <TabBloques
             version={versionBloques}
@@ -219,7 +226,20 @@ const PARAMETROS_VACIOS = {
   Parametro_Institucional_Bloques_Maximos_Diarios: "",
 };
 
-function TabParametros({ onJornadaCambiada }) {
+function formatearDuracionMin(min) {
+  if (!Number.isFinite(min) || min <= 0) return "—";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
+}
+
+function mostrarNumeroParam(val) {
+  return val !== "" && val !== null && val !== undefined ? val : "—";
+}
+
+function TabParametros({ onJornadaCambiada, onParametrosGuardados }) {
   const [form, setForm]           = useState(null);
   const [sinConfigurar, setSinConfigurar] = useState(false); // aún no existen los parámetros
   const [impacto, setImpacto]     = useState(null); // clases que quedarían fuera de la nueva jornada
@@ -245,9 +265,9 @@ function TabParametros({ onJornadaCambiada }) {
         const f = {
           Parametro_Institucional_Inicio_Jornada:          hhmm(data.Parametro_Institucional_Inicio_Jornada),
           Parametro_Institucional_Fin_Jornada:             hhmm(data.Parametro_Institucional_Fin_Jornada),
-          Parametro_Institucional_Duracion_Bloque:         String(data.Parametro_Institucional_Duracion_Bloque),
-          Parametro_Institucional_Duracion_Recreo:         String(data.Parametro_Institucional_Duracion_Recreo),
-          Parametro_Institucional_Bloques_Maximos_Diarios: String(data.Parametro_Institucional_Bloques_Maximos_Diarios),
+          Parametro_Institucional_Duracion_Bloque:         String(data.Parametro_Institucional_Duracion_Bloque ?? ""),
+          Parametro_Institucional_Duracion_Recreo:         String(data.Parametro_Institucional_Duracion_Recreo ?? ""),
+          Parametro_Institucional_Bloques_Maximos_Diarios: String(data.Parametro_Institucional_Bloques_Maximos_Diarios ?? ""),
         };
         setForm(f);
         setOriginal(f);
@@ -261,21 +281,55 @@ function TabParametros({ onJornadaCambiada }) {
 
   const handleChange = (e) => {
     setImpacto(null);
+    setError("");
+    setExito("");
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   };
 
   const hayCambios = form && original && JSON.stringify(form) !== JSON.stringify(original);
 
   const cambiaJornada = form && original && (
-    form.Parametro_Institucional_Inicio_Jornada !== original.Parametro_Institucional_Inicio_Jornada ||
-    form.Parametro_Institucional_Fin_Jornada    !== original.Parametro_Institucional_Fin_Jornada
+    hhmm(form.Parametro_Institucional_Inicio_Jornada) !== hhmm(original.Parametro_Institucional_Inicio_Jornada) ||
+    hhmm(form.Parametro_Institucional_Fin_Jornada)    !== hhmm(original.Parametro_Institucional_Fin_Jornada)
   );
 
   const handleGuardar = async (e, confirmado = false) => {
     e?.preventDefault();
-    setGuardando(true);
     setError("");
     setExito("");
+
+    const inicioNorm = hhmm(form?.Parametro_Institucional_Inicio_Jornada);
+    const finNorm    = hhmm(form?.Parametro_Institucional_Fin_Jornada);
+    const durBloque  = Number(form?.Parametro_Institucional_Duracion_Bloque);
+    const durRecreo  = Number(form?.Parametro_Institucional_Duracion_Recreo);
+    const maxBloques = Number(form?.Parametro_Institucional_Bloques_Maximos_Diarios);
+
+    if (!inicioNorm || !finNorm || inicioNorm >= finNorm) {
+      setError("El inicio de jornada debe ser anterior al fin de jornada.");
+      return;
+    }
+    if (
+      String(form?.Parametro_Institucional_Duracion_Bloque ?? "").trim() === "" ||
+      String(form?.Parametro_Institucional_Duracion_Recreo ?? "").trim() === "" ||
+      String(form?.Parametro_Institucional_Bloques_Maximos_Diarios ?? "").trim() === "" ||
+      ![durBloque, durRecreo, maxBloques].every(Number.isInteger) ||
+      durBloque < 1 || durBloque > 180 ||
+      durRecreo < 0 || durRecreo > 120 ||
+      maxBloques < 1 || maxBloques > 20
+    ) {
+      setError("Revisa los parámetros numéricos: bloque (1–180 min), recreo (0–120 min) y máximo diario (1–20).");
+      return;
+    }
+
+    const payload = {
+      Parametro_Institucional_Inicio_Jornada:          inicioNorm,
+      Parametro_Institucional_Fin_Jornada:             finNorm,
+      Parametro_Institucional_Duracion_Bloque:         String(durBloque),
+      Parametro_Institucional_Duracion_Recreo:         String(durRecreo),
+      Parametro_Institucional_Bloques_Maximos_Diarios: String(maxBloques),
+    };
+
+    setGuardando(true);
     try {
       // Si la nueva jornada deja bloques fuera, se avisa antes de guardar
       // (la primera configuración no tiene una jornada anterior que comparar)
@@ -283,12 +337,16 @@ function TabParametros({ onJornadaCambiada }) {
         const resImp  = await fetch(`${API}/parametros/impacto`, {
           method: "POST",
           headers: authHeaders(),
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         const dataImp = await resImp.json();
-        if (!resImp.ok) throw new Error(dataImp.error);
-        if (dataImp.bloques.length > 0) {
-          setImpacto(dataImp);
+        if (!resImp.ok) throw new Error(dataImp.error || "Error al verificar impacto de jornada");
+        const bloquesAfectados = Array.isArray(dataImp?.bloques) ? dataImp.bloques : [];
+        if (bloquesAfectados.length > 0) {
+          setImpacto({
+            clases: dataImp?.clases || 0,
+            bloques: bloquesAfectados,
+          });
           return;
         }
       }
@@ -296,22 +354,25 @@ function TabParametros({ onJornadaCambiada }) {
       const res  = await fetch(`${API}/parametros`, {
         method: "PUT",
         headers: authHeaders(),
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      const eraPrimeraVez = sinConfigurar;
-      setOriginal(form);
+      if (!res.ok) throw new Error(data.error || "Error al guardar parámetros");
+      const eraPrimeraVez    = sinConfigurar;
+      const clasesPendientes = impacto?.clases || 0;
+      setForm(payload);
+      setOriginal(payload);
       setImpacto(null);
       setSinConfigurar(false);
       setExito(
         eraPrimeraVez
           ? "Parámetros institucionales creados. Ya puedes registrar los bloques horarios."
-          : impacto?.clases > 0
-            ? `Parámetros guardados. ${impacto.clases} clase(s) quedaron pendientes de reubicar en el panel de avisos.`
+          : clasesPendientes > 0
+            ? `Parámetros guardados. ${clasesPendientes} clase(s) quedaron pendientes de reubicar en el panel de avisos.`
             : "Parámetros guardados correctamente."
       );
       setTimeout(() => setExito(""), 5000);
+      onParametrosGuardados?.();
       if (cambiaJornada && !eraPrimeraVez) onJornadaCambiada?.();
     } catch (e) {
       setError(e.message || "Error al guardar");
@@ -329,6 +390,13 @@ function TabParametros({ onJornadaCambiada }) {
       </div>
     );
   }
+
+  const inicioNorm = hhmm(form.Parametro_Institucional_Inicio_Jornada);
+  const finNorm    = hhmm(form.Parametro_Institucional_Fin_Jornada);
+  const durJornada = inicioNorm && finNorm && inicioNorm < finNorm ? calcDuracion(inicioNorm, finNorm) : 0;
+  const durBloqueNum  = Number(form.Parametro_Institucional_Duracion_Bloque);
+  const maxBloquesNum = Number(form.Parametro_Institucional_Bloques_Maximos_Diarios);
+  const minNecesarios = durBloqueNum > 0 && maxBloquesNum > 0 ? durBloqueNum * maxBloquesNum : 0;
 
   return (
     <div style={s.seccion}>
@@ -367,6 +435,11 @@ function TabParametros({ onJornadaCambiada }) {
                 onChange={handleChange} style={s.input} required />
             </div>
           </div>
+          {inicioNorm && finNorm && inicioNorm >= finNorm && (
+            <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#dc2626", fontWeight: 600 }}>
+              El inicio de jornada ({inicioNorm}) debe ser anterior al término ({finNorm}).
+            </p>
+          )}
         </fieldset>
 
         <fieldset style={s.fieldset}>
@@ -395,22 +468,42 @@ function TabParametros({ onJornadaCambiada }) {
 
         {form && (
           <div style={s.resumenBox}>
-            <strong style={{ color: "#1e3a5f", fontSize: "0.85rem" }}>Resumen configurado:</strong>
+            <strong style={{ color: "#1e3a5f", fontSize: "0.85rem" }}>Resumen configurado (24 h):</strong>
             <ul style={s.resumenList}>
-              <li>Jornada: <b>{form.Parametro_Institucional_Inicio_Jornada || "—"}</b> → <b>{form.Parametro_Institucional_Fin_Jornada || "—"}</b></li>
-              <li>Duración bloque: <b>{form.Parametro_Institucional_Duracion_Bloque || "—"} min</b></li>
-              <li>Duración recreo: <b>{form.Parametro_Institucional_Duracion_Recreo || "—"} min</b></li>
-              <li>Máx. bloques/día: <b>{form.Parametro_Institucional_Bloques_Maximos_Diarios || "—"}</b></li>
+              <li>
+                Jornada: <b>{inicioNorm || "—"}</b> → <b>{finNorm || "—"}</b>
+                {durJornada > 0 && (
+                  <span style={{ color: "#4b5563" }}> ({formatearDuracionMin(durJornada)} · {durJornada} min)</span>
+                )}
+              </li>
+              <li>Duración bloque: <b>{mostrarNumeroParam(form.Parametro_Institucional_Duracion_Bloque)} min</b></li>
+              <li>Duración recreo: <b>{mostrarNumeroParam(form.Parametro_Institucional_Duracion_Recreo)} min</b></li>
+              <li>
+                Máx. bloques/día: <b>{mostrarNumeroParam(form.Parametro_Institucional_Bloques_Maximos_Diarios)}</b>
+                {minNecesarios > 0 && (
+                  <span style={{ color: "#4b5563" }}> ({maxBloquesNum} × {durBloqueNum} min = {minNecesarios} min en clases)</span>
+                )}
+              </li>
             </ul>
+            {durJornada > 0 && durBloqueNum > durJornada && (
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#92400e", fontWeight: 600 }}>
+                ⚠ Un bloque estándar de {durBloqueNum} min supera la duración total de la jornada ({durJornada} min).
+              </p>
+            )}
+            {durJornada > 0 && durBloqueNum <= durJornada && minNecesarios > durJornada && (
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8rem", color: "#92400e" }}>
+                ⚠ {maxBloquesNum} bloques continuos de {durBloqueNum} min requieren {minNecesarios} min y exceden la jornada configurada ({durJornada} min).
+              </p>
+            )}
           </div>
         )}
 
         {impacto && (
           <div style={{ background: "#fefce8", border: "1px solid #fde047", borderLeft: "5px solid #eab308",
             borderRadius: 8, padding: "0.8rem 1rem", marginTop: "1rem", color: "#713f12" }}>
-            <strong>⚠ La nueva jornada deja {impacto.bloques.length} bloque(s) fuera de horario</strong>
+            <strong>⚠ La nueva jornada deja {(impacto.bloques || []).length} bloque(s) fuera de horario</strong>
             <ul style={{ margin: "0.4rem 0 0.4rem 1rem", padding: 0, fontSize: "0.85rem" }}>
-              {impacto.bloques.map((b) => (
+              {(impacto.bloques || []).map((b) => (
                 <li key={b.Bloque_Horario_Id}>
                   {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)} · {b.Bloque_Horario_Jornada} · {b.Bloque_Horario_Tipo}
                   {" — "}{b.Clases > 0 ? `${b.Clases} clase(s)` : "sin clases"}
@@ -422,7 +515,7 @@ function TabParametros({ onJornadaCambiada }) {
                 ? `Las ${impacto.clases} clase(s) quedarán pendientes en el panel de avisos para migrarlas a otro bloque, eliminarlas o decidir más tarde.`
                 : "Esos bloques no tienen clases; quedarán marcados como fuera de la jornada."}
             </p>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <button type="button" className="btn-primary" disabled={guardando} onClick={() => handleGuardar(null, true)}>
                 {guardando ? "Guardando..." : "Guardar de todos modos"}
               </button>
@@ -433,13 +526,14 @@ function TabParametros({ onJornadaCambiada }) {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+        <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
           <button type="submit" className="btn-primary" disabled={guardando || !hayCambios || !!impacto}
-            style={{ opacity: !hayCambios ? 0.5 : 1 }}>
+            style={{ opacity: !hayCambios || !!impacto ? 0.5 : 1, minHeight: 42 }}>
             {guardando ? "Guardando..." : sinConfigurar ? "Crear parámetros" : "Guardar parámetros"}
           </button>
           {hayCambios && !sinConfigurar && (
-            <button type="button" onClick={() => { setForm(original); setImpacto(null); }} style={s.btnSecundario}>
+            <button type="button" onClick={() => { setForm(original); setImpacto(null); setError(""); }}
+              style={{ ...s.btnSecundario, minHeight: 42 }}>
               Descartar cambios
             </button>
           )}
@@ -519,13 +613,35 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
 
   /* Duración estándar según tipo (solo Clase y Recreo) */
   const duracionSugerida = (tipo) => {
-    if (tipo === "Recreo") return parametros?.Parametro_Institucional_Duracion_Recreo ?? 15;
-    return parametros?.Parametro_Institucional_Duracion_Bloque ?? 45;
+    if (tipo === "Recreo") return Number(parametros?.Parametro_Institucional_Duracion_Recreo ?? 15);
+    return Number(parametros?.Parametro_Institucional_Duracion_Bloque ?? 45);
   };
 
   const abrirCrear = () => {
-    setForm(EMPTY_BLOQUE);
+    const iniParam = hhmm(parametros?.Parametro_Institucional_Inicio_Jornada);
+    const finParam = hhmm(parametros?.Parametro_Institucional_Fin_Jornada);
+    const activos  = bloques
+      .filter((b) => Number(b.desajustado) !== 1)
+      .filter((b) => (!iniParam || hhmm(b.Bloque_Horario_Hora_Inicio) >= iniParam) && (!finParam || hhmm(b.Bloque_Horario_Hora_Fin) <= finParam))
+      .sort((a, b) => hhmm(a.Bloque_Horario_Hora_Fin).localeCompare(hhmm(b.Bloque_Horario_Hora_Fin)));
+
+    const ultimoFin = activos.length ? hhmm(activos[activos.length - 1].Bloque_Horario_Hora_Fin) : "";
+    let iniSug = "";
+    if (ultimoFin && (!finParam || ultimoFin < finParam)) iniSug = ultimoFin;
+    else if (iniParam && (!finParam || iniParam < finParam) && activos.length === 0) iniSug = iniParam;
+
+    const durClase = duracionSugerida("Clase");
+    const finCalc  = iniSug ? sumarMinutos(iniSug, durClase) : "";
+    const finSug   = finCalc && (!finParam || finCalc <= finParam) ? finCalc : "";
+
+    setForm({
+      Bloque_Horario_Hora_Inicio: iniSug,
+      Bloque_Horario_Hora_Fin:    finSug,
+      Bloque_Horario_Jornada:     jornadaDeHora(iniSug),
+      Bloque_Horario_Tipo:        "Clase",
+    });
     setEditando(null);
+    setSuperposicion(null);
     setErrorPanel("");
     setPanelAbierto(true);
   };
@@ -538,6 +654,7 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
       Bloque_Horario_Tipo:        b.Bloque_Horario_Tipo,
     });
     setEditando(b.Bloque_Horario_Id);
+    setSuperposicion(null);
     setErrorPanel("");
     setPanelAbierto(true);
   };
@@ -547,14 +664,22 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setSuperposicion(null);
+    setErrorPanel("");
     setForm((prev) => {
       const next = { ...prev, [name]: value };
       if (name === "Bloque_Horario_Tipo" && prev.Bloque_Horario_Hora_Inicio) {
         const dur = duracionSugerida(value);
-        next.Bloque_Horario_Hora_Fin = sumarMinutos(prev.Bloque_Horario_Hora_Inicio, dur);
+        next.Bloque_Horario_Hora_Fin = dur > 0 ? sumarMinutos(prev.Bloque_Horario_Hora_Inicio, dur) : "";
       }
       if (name === "Bloque_Horario_Hora_Inicio") {
         next.Bloque_Horario_Jornada = jornadaDeHora(value);
+        const dur = duracionSugerida(next.Bloque_Horario_Tipo);
+        const prevFinSug = prev.Bloque_Horario_Hora_Inicio
+          ? sumarMinutos(prev.Bloque_Horario_Hora_Inicio, dur)
+          : "";
+        if (!editando || !prev.Bloque_Horario_Hora_Fin || prev.Bloque_Horario_Hora_Fin === prevFinSug) {
+          next.Bloque_Horario_Hora_Fin = dur > 0 ? sumarMinutos(value, dur) : "";
+        }
       }
       return next;
     });
@@ -562,18 +687,39 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
 
   const usarDuracionSugerida = () => {
     const dur         = duracionSugerida(form.Bloque_Horario_Tipo);
-    const horaFinCalc = sumarMinutos(form.Bloque_Horario_Hora_Inicio, dur);
-    if (horaFinCalc) setForm((p) => ({ ...p, Bloque_Horario_Hora_Fin: horaFinCalc }));
+    const horaFinCalc = dur > 0 ? sumarMinutos(form.Bloque_Horario_Hora_Inicio, dur) : "";
+    if (horaFinCalc) {
+      setErrorPanel("");
+      setForm((p) => ({ ...p, Bloque_Horario_Hora_Fin: horaFinCalc }));
+    }
   };
 
   const handleGuardar = async (e, reemplazar = false) => {
     e?.preventDefault();
-    setGuardando(true);
     setErrorPanel("");
+    const hIni = hhmm(form.Bloque_Horario_Hora_Inicio);
+    const hFin = hhmm(form.Bloque_Horario_Hora_Fin);
+    if (!hIni || !hFin || hIni >= hFin) {
+      setErrorPanel("La hora de inicio debe ser anterior a la hora de término.");
+      return;
+    }
+    const pIni = hhmm(parametros?.Parametro_Institucional_Inicio_Jornada);
+    const pFin = hhmm(parametros?.Parametro_Institucional_Fin_Jornada);
+    if (pIni && pFin && (hIni < pIni || hFin > pFin)) {
+      setErrorPanel(`El bloque debe estar dentro de la jornada institucional (${pIni} – ${pFin}).`);
+      return;
+    }
+
+    setGuardando(true);
     try {
       const url    = editando ? `${API}/${editando}` : API;
       const method = editando ? "PUT" : "POST";
-      const body   = editando ? form : { ...form, reemplazar };
+      const payload = {
+        ...form,
+        Bloque_Horario_Hora_Inicio: hIni,
+        Bloque_Horario_Hora_Fin:    hFin,
+      };
+      const body   = editando ? payload : { ...payload, reemplazar };
       const res    = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
       const data   = await res.json();
       // Redefinir: el nuevo bloque se superpone con otros; se pide confirmar el reemplazo
@@ -586,7 +732,7 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
       cargar();
       if (data.clasesPendientes > 0) onConflictos?.();
       // CU49: confirmar al usuario que el bloque quedó actualizado
-      setExito(data.mensaje || "Bloque actualizado correctamente");
+      setExito(data.mensaje || (editando ? "Bloque actualizado correctamente" : "Bloque registrado exitosamente"));
       setTimeout(() => setExito(""), 3500);
     } catch (e) {
       setErrorPanel(e.message || "Error al guardar");
@@ -677,22 +823,23 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
 
   const bloquesClase  = bloques.filter((b) => b.Bloque_Horario_Tipo === "Clase");
   const bloquesRecreo = bloques.filter((b) => b.Bloque_Horario_Tipo === "Recreo");
-  const bloquesDesajustados = bloques.filter((b) => Number(b.desajustado) === 1).length;
+  const bloquesDesajustados = bloques.filter((b) => Number(b.desajustado) === 1);
+  const clasesDesajustadas  = bloquesDesajustados.reduce((acc, b) => acc + Number(b.clases || 0), 0);
 
   const durSugerida     = duracionSugerida(form.Bloque_Horario_Tipo);
-  const horaFinSugerida = sumarMinutos(form.Bloque_Horario_Hora_Inicio, durSugerida);
-  const yaUsaSugerida   = form.Bloque_Horario_Hora_Fin === horaFinSugerida && !!horaFinSugerida;
+  const horaFinSugerida = durSugerida > 0 ? sumarMinutos(form.Bloque_Horario_Hora_Inicio, durSugerida) : "";
+  const yaUsaSugerida   = durSugerida > 0 && form.Bloque_Horario_Hora_Fin === horaFinSugerida && !!horaFinSugerida;
 
   return (
     <div style={s.seccion}>
-      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
           <h2 style={s.seccionTitulo}>Bloques horarios</h2>
           <p style={s.seccionDesc}>
             Registra los bloques de tiempo de la jornada escolar: Clase y Recreo.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setVista("calendario")}
               style={{ padding: "0.35rem 0.75rem", border: "none", cursor: "pointer",
@@ -729,6 +876,28 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
           «Parámetros institucionales» antes de registrar bloques horarios.
         </div>
       )}
+      {!sinParametros && parametros?.Parametro_Institucional_Inicio_Jornada && (
+        <div style={s.paramStrip}>
+          <span>📐 <strong>Parámetros vigentes:</strong> Jornada {hhmm(parametros.Parametro_Institucional_Inicio_Jornada)} – {hhmm(parametros.Parametro_Institucional_Fin_Jornada)}</span>
+          <span>· Clase: <strong>{parametros.Parametro_Institucional_Duracion_Bloque} min</strong></span>
+          <span>· Recreo: <strong>{parametros.Parametro_Institucional_Duracion_Recreo} min</strong></span>
+          <span>· Máx./día: <strong>{parametros.Parametro_Institucional_Bloques_Maximos_Diarios}</strong></span>
+        </div>
+      )}
+      {bloquesDesajustados.length > 0 && (
+        <div style={{ ...s.avisoBanner, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.6rem" }}>
+          <span>
+            ⚠ Hay <strong>{bloquesDesajustados.length}</strong> bloque(s) fuera de la jornada actual o reemplazado(s)
+            {clasesDesajustadas > 0 ? ` (${clasesDesajustadas} clase(s) por reubicar)` : ""}.
+          </span>
+          {clasesDesajustadas > 0 && (
+            <button type="button" onClick={() => onConflictos?.()}
+              style={{ ...s.btnSecundario, background: "#fffbeb", borderColor: "#f59e0b", color: "#92400e", fontWeight: 700, fontSize: "0.82rem" }}>
+              Revisar clases pendientes
+            </button>
+          )}
+        </div>
+      )}
       {error && <div style={s.errorBanner}>{error}</div>}
       {exito && <div style={s.exitoBanner}>✅ {exito}</div>}
 
@@ -745,14 +914,15 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
             <StatMini label="Clases"  value={bloquesClase.length}  color="#1e40af" bg="#dbeafe" />
             <StatMini label="Recreos" value={bloquesRecreo.length} color="#166534" bg="#dcfce7" />
             <StatMini label="Total"   value={bloques.length}       color="#374151" bg="#f3f4f6" />
-            {bloquesDesajustados > 0 && (
-              <StatMini label="⚠ Desajustados" value={bloquesDesajustados} color="#854d0e" bg="#fefce8" />
+            {bloquesDesajustados.length > 0 && (
+              <StatMini label="⚠ Desajustados" value={bloquesDesajustados.length} color="#854d0e" bg="#fefce8" />
             )}
           </div>
 
           {vista === "calendario" ? (
             <VistaCalendarioBloques
               bloques={bloques}
+              parametros={parametros}
               onEditar={abrirEditar}
               onEliminar={handleEliminar}
               eliminando={eliminando}
@@ -841,164 +1011,199 @@ function TabBloques({ version = 0, onConflictos, onQuitarBloqueConClases }) {
       )}
 
       {/* Panel lateral derecho */}
-      {panelAbierto && (
-        <div style={s.panel}>
-            <div style={s.panelHeader}>
-              <div>
-                <h2 style={{ margin: 0, color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
-                  {editando ? "Editar bloque horario" : "Nuevo bloque horario"}
-                </h2>
-                <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#94a3b8" }}>
-                  Configuración de bloques de tiempo {/* CU49 */}
-                </p>
-              </div>
-              <button onClick={cerrarPanel} style={s.panelBtnClose} title="Cerrar">✕</button>
-            </div>
+      {panelAbierto && (() => {
+        const iniJornada = hhmm(parametros?.Parametro_Institucional_Inicio_Jornada);
+        const finJornada = hhmm(parametros?.Parametro_Institucional_Fin_Jornada);
+        const maxBloques = Number(parametros?.Parametro_Institucional_Bloques_Maximos_Diarios || 0);
+        const claseVigentes = bloques.filter(
+          (b) => b.Bloque_Horario_Tipo === "Clase" && Number(b.desajustado) !== 1
+        ).length;
+        const durActual = form.Bloque_Horario_Hora_Inicio && form.Bloque_Horario_Hora_Fin
+          ? calcDuracion(`${form.Bloque_Horario_Hora_Inicio}:00`, `${form.Bloque_Horario_Hora_Fin}:00`)
+          : 0;
 
-            <div style={s.panelBody}>
-              <form onSubmit={handleGuardar}>
-
-                {/* Tipo de bloque: solo Clase o Recreo */}
-                <label style={s.labelPanel}>Tipo de bloque *</label>
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                  {TIPOS_BLOQUE.map((t) => {
-                    const col = TIPO_COLORES[t];
-                    const activo = form.Bloque_Horario_Tipo === t;
-                    return (
-                      <button key={t} type="button"
-                        onClick={() => handleFormChange({ target: { name: "Bloque_Horario_Tipo", value: t } })}
-                        style={{
-                          flex: 1, padding: "0.5rem 0.5rem", borderRadius: "8px",
-                          border: `2px solid ${activo ? col.acento : "#e5e7eb"}`,
-                          background: activo ? col.bg : "#f9fafb",
-                          color: activo ? col.acento : "#6b7280",
-                          fontWeight: activo ? 700 : 400,
-                          fontSize: "0.85rem", cursor: "pointer", transition: "all 0.15s",
-                        }}>
-                        {col.icono} {t}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Hora inicio y fin */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div>
-                    <label style={s.labelPanel}>Hora inicio *</label>
-                    <input type="time" name="Bloque_Horario_Hora_Inicio"
-                      value={form.Bloque_Horario_Hora_Inicio}
-                      onChange={handleFormChange}
-                      style={s.inputPanel} required />
-                  </div>
-                  <div>
-                    <label style={s.labelPanel}>Hora término *</label>
-                    <input type="time" name="Bloque_Horario_Hora_Fin"
-                      value={form.Bloque_Horario_Hora_Fin}
-                      onChange={handleFormChange}
-                      style={s.inputPanel} required />
-                  </div>
-                </div>
-
-                {/* Sugerencia de duración */}
-                {form.Bloque_Horario_Hora_Inicio && (
-                  <div style={{
-                    margin: "0.5rem 0",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "8px",
-                    background: yaUsaSugerida ? "#f0fdf4" : "#fff7ed",
-                    border: `1px solid ${yaUsaSugerida ? "#bbf7d0" : "#fed7aa"}`,
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem",
-                  }}>
-                    <span style={{ fontSize: "0.8rem", color: yaUsaSugerida ? "#15803d" : "#9a3412" }}>
-                      {yaUsaSugerida
-                        ? `✓ Usando duración estándar de ${durSugerida} min para ${form.Bloque_Horario_Tipo}`
-                        : `Duración estándar "${form.Bloque_Horario_Tipo}": ${durSugerida} min → termina ${horaFinSugerida || "—"}`}
-                    </span>
-                    {!yaUsaSugerida && horaFinSugerida && (
-                      <button type="button" onClick={usarDuracionSugerida}
-                        style={{ padding: "0.25rem 0.65rem", borderRadius: "6px",
-                          border: "1px solid #f97316", background: "#fff7ed",
-                          color: "#ea580c", fontSize: "0.75rem", fontWeight: 700,
-                          cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-                        Usar sugerida
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Duración calculada */}
-                {form.Bloque_Horario_Hora_Inicio && form.Bloque_Horario_Hora_Fin && (() => {
-                  const dur = calcDuracion(
-                    form.Bloque_Horario_Hora_Inicio + ":00",
-                    form.Bloque_Horario_Hora_Fin + ":00"
-                  );
-                  return dur > 0 ? (
-                    <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "0 0 0.5rem" }}>
-                      Duración calculada: <strong>{dur} minutos</strong>
-                    </p>
-                  ) : null;
-                })()}
-
-                {/* Jornada (auto-derivada de hora_inicio) */}
-                <label style={s.labelPanel}>Jornada *</label>
-                <select name="Bloque_Horario_Jornada"
-                  value={form.Bloque_Horario_Jornada}
-                  onChange={handleFormChange}
-                  style={s.inputPanel} required>
-                  {JORNADAS.map((j) => <option key={j} value={j}>{j}</option>)}
-                </select>
-                <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: "2px 0 0.5rem" }}>
-                  Derivada automáticamente de la hora de inicio.
-                </p>
-
-                {errorPanel && (
-                  <p style={{ color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem",
-                    background: "#fee2e2", padding: "0.5rem 0.75rem", borderRadius: "6px" }}>
-                    {errorPanel}
+        return (
+          <div style={s.panelOverlay} onClick={cerrarPanel}>
+            <div style={s.panel} onClick={(e) => e.stopPropagation()}>
+              <div style={s.panelHeader}>
+                <div>
+                  <h2 style={{ margin: 0, color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
+                    {editando ? "Editar bloque horario" : "Nuevo bloque horario"}
+                  </h2>
+                  <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#94a3b8" }}>
+                    Configuración de bloques de tiempo {/* CU49 */}
                   </p>
-                )}
-
-                {superposicion && (() => {
-                  const clases = superposicion.reduce((t, b) => t + b.clases, 0);
-                  return (
-                    <div style={{ marginTop: "0.75rem", background: "#fefce8", border: "1px solid #fde047",
-                      borderLeft: "5px solid #eab308", borderRadius: 8, padding: "0.7rem 0.8rem", color: "#713f12", fontSize: "0.85rem" }}>
-                      <strong>⚠ Este bloque se superpone con:</strong>
-                      <ul style={{ margin: "0.3rem 0 0.4rem 1rem", padding: 0 }}>
-                        {superposicion.map((b) => (
-                          <li key={b.Bloque_Horario_Id}>
-                            {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)} · {b.Bloque_Horario_Tipo}
-                            {" — "}{b.clases > 0 ? `${b.clases} clase(s)` : "sin clases"}
-                          </li>
-                        ))}
-                      </ul>
-                      <p style={{ margin: "0 0 0.5rem" }}>
-                        Si lo creas, reemplazará a esos bloques.
-                        {clases > 0
-                          ? ` Sus ${clases} clase(s) quedarán pendientes en el panel de avisos para migrarlas, eliminarlas o decidir más tarde.`
-                          : " Como no tienen clases, se eliminarán."}
-                      </p>
-                      <button type="button" className="btn-primary" disabled={guardando}
-                        onClick={() => handleGuardar(null, true)}>
-                        {guardando ? "Creando..." : "Reemplazar y crear bloque"}
-                      </button>
-                    </div>
-                  );
-                })()}
-
-                <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
-                  <button type="button" onClick={cerrarPanel}
-                    style={{ ...s.btnSecundario, flex: 1 }} disabled={guardando}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn-primary" style={{ flex: 2 }} disabled={guardando}>
-                    {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Crear bloque"}
-                  </button>
                 </div>
-              </form>
+                <button type="button" onClick={cerrarPanel} style={s.panelBtnClose} title="Cerrar">✕</button>
+              </div>
+
+              <div style={s.panelBody}>
+                <form onSubmit={handleGuardar}>
+
+                  {/* Tipo de bloque: solo Clase o Recreo */}
+                  <label style={s.labelPanel}>Tipo de bloque *</label>
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    {TIPOS_BLOQUE.map((t) => {
+                      const col = TIPO_COLORES[t];
+                      const activo = form.Bloque_Horario_Tipo === t;
+                      return (
+                        <button key={t} type="button"
+                          onClick={() => handleFormChange({ target: { name: "Bloque_Horario_Tipo", value: t } })}
+                          style={{
+                            flex: 1, padding: "0.5rem 0.5rem", borderRadius: "8px",
+                            border: `2px solid ${activo ? col.acento : "#e5e7eb"}`,
+                            background: activo ? col.bg : "#f9fafb",
+                            color: activo ? col.acento : "#6b7280",
+                            fontWeight: activo ? 700 : 400,
+                            fontSize: "0.85rem", cursor: "pointer", transition: "all 0.15s",
+                          }}>
+                          {col.icono} {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Hora inicio y fin */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    <div>
+                      <label style={s.labelPanel}>Hora inicio *</label>
+                      <input type="time" name="Bloque_Horario_Hora_Inicio"
+                        value={form.Bloque_Horario_Hora_Inicio}
+                        onChange={handleFormChange}
+                        min={iniJornada || undefined}
+                        max={finJornada || undefined}
+                        style={s.inputPanel} required />
+                    </div>
+                    <div>
+                      <label style={s.labelPanel}>Hora término *</label>
+                      <input type="time" name="Bloque_Horario_Hora_Fin"
+                        value={form.Bloque_Horario_Hora_Fin}
+                        onChange={handleFormChange}
+                        min={iniJornada || undefined}
+                        max={finJornada || undefined}
+                        style={s.inputPanel} required />
+                    </div>
+                  </div>
+                  {iniJornada && finJornada && (
+                    <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "4px 0 0.25rem" }}>
+                      Rango permitido por jornada institucional: <strong>{iniJornada} – {finJornada}</strong>
+                    </p>
+                  )}
+
+                  {/* Sugerencia de duración */}
+                  {form.Bloque_Horario_Hora_Inicio && (
+                    <div style={{
+                      margin: "0.5rem 0",
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "8px",
+                      background: durSugerida <= 0 ? "#f8fafc" : yaUsaSugerida ? "#f0fdf4" : "#fff7ed",
+                      border: `1px solid ${durSugerida <= 0 ? "#e2e8f0" : yaUsaSugerida ? "#bbf7d0" : "#fed7aa"}`,
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap",
+                    }}>
+                      <span style={{ fontSize: "0.8rem", color: durSugerida <= 0 ? "#475569" : yaUsaSugerida ? "#15803d" : "#9a3412" }}>
+                        {durSugerida <= 0
+                          ? `Duración estándar "${form.Bloque_Horario_Tipo}": 0 min`
+                          : yaUsaSugerida
+                            ? `✓ Usando duración estándar de ${durSugerida} min para ${form.Bloque_Horario_Tipo}`
+                            : `Duración estándar "${form.Bloque_Horario_Tipo}": ${durSugerida} min → termina ${horaFinSugerida || "—"}`}
+                      </span>
+                      {durSugerida > 0 && !yaUsaSugerida && horaFinSugerida && (
+                        <button type="button" onClick={usarDuracionSugerida}
+                          style={{ padding: "0.25rem 0.65rem", borderRadius: "6px",
+                            border: "1px solid #f97316", background: "#fff7ed",
+                            color: "#ea580c", fontSize: "0.75rem", fontWeight: 700,
+                            cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                          Usar sugerida
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Duración calculada */}
+                  {form.Bloque_Horario_Hora_Inicio && form.Bloque_Horario_Hora_Fin && (
+                    durActual > 0 ? (
+                      <p style={{ fontSize: "0.82rem", color: "#6b7280", margin: "0 0 0.5rem" }}>
+                        Duración calculada: <strong>{durActual} minutos</strong>
+                        {durSugerida > 0 && durActual !== durSugerida && (
+                          <span style={{ color: "#9a3412" }}> (estándar configurado: {durSugerida} min)</span>
+                        )}
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: "0.82rem", color: "#dc2626", margin: "0 0 0.5rem", fontWeight: 600 }}>
+                        La hora de término debe ser posterior a la hora de inicio.
+                      </p>
+                    )
+                  )}
+
+                  {!editando && form.Bloque_Horario_Tipo === "Clase" && maxBloques > 0 && claseVigentes >= maxBloques && (
+                    <p style={{ fontSize: "0.78rem", color: "#92400e", background: "#fefce8",
+                      border: "1px solid #fde68a", padding: "0.45rem 0.65rem", borderRadius: 6, margin: "0.35rem 0 0.5rem" }}>
+                      ℹ Ya existen {claseVigentes} bloque(s) de clase vigentes (máximo diario por curso: {maxBloques}).
+                    </p>
+                  )}
+
+                  {/* Jornada (auto-derivada de hora_inicio) */}
+                  <label style={s.labelPanel}>Jornada *</label>
+                  <select name="Bloque_Horario_Jornada"
+                    value={form.Bloque_Horario_Jornada}
+                    onChange={handleFormChange}
+                    style={s.inputPanel} required>
+                    {JORNADAS.map((j) => <option key={j} value={j}>{j}</option>)}
+                  </select>
+                  <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: "2px 0 0.5rem" }}>
+                    Derivada automáticamente de la hora de inicio.
+                  </p>
+
+                  {errorPanel && (
+                    <p style={{ color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem",
+                      background: "#fee2e2", padding: "0.5rem 0.75rem", borderRadius: "6px" }}>
+                      {errorPanel}
+                    </p>
+                  )}
+
+                  {superposicion && (() => {
+                    const clases = superposicion.reduce((t, b) => t + b.clases, 0);
+                    return (
+                      <div style={{ marginTop: "0.75rem", background: "#fefce8", border: "1px solid #fde047",
+                        borderLeft: "5px solid #eab308", borderRadius: 8, padding: "0.7rem 0.8rem", color: "#713f12", fontSize: "0.85rem" }}>
+                        <strong>⚠ Este bloque se superpone con:</strong>
+                        <ul style={{ margin: "0.3rem 0 0.4rem 1rem", padding: 0 }}>
+                          {superposicion.map((b) => (
+                            <li key={b.Bloque_Horario_Id}>
+                              {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)} · {b.Bloque_Horario_Tipo}
+                              {" — "}{b.clases > 0 ? `${b.clases} clase(s)` : "sin clases"}
+                            </li>
+                          ))}
+                        </ul>
+                        <p style={{ margin: "0 0 0.5rem" }}>
+                          Si lo creas, reemplazará a esos bloques.
+                          {clases > 0
+                            ? ` Sus ${clases} clase(s) quedarán pendientes en el panel de avisos para migrarlas, eliminarlas o decidir más tarde.`
+                            : " Como no tienen clases, se eliminarán."}
+                        </p>
+                        <button type="button" className="btn-primary" disabled={guardando}
+                          onClick={() => handleGuardar(null, true)}>
+                          {guardando ? "Creando..." : "Reemplazar y crear bloque"}
+                        </button>
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", flexWrap: "wrap" }}>
+                    <button type="button" onClick={cerrarPanel}
+                      style={{ ...s.btnSecundario, flex: 1, minHeight: 42 }} disabled={guardando}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-primary" style={{ flex: 2, minHeight: 42 }} disabled={guardando}>
+                      {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Crear bloque"}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -1145,7 +1350,7 @@ function TabEventos() {
 
   return (
     <div style={s.seccion}>
-      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
           <h2 style={s.seccionTitulo}>Eventos institucionales</h2>
           <p style={s.seccionDesc}>
@@ -1153,7 +1358,7 @@ function TabEventos() {
             suspensiones parciales o totales de jornada.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             <button onClick={() => setVista("calendario")}
               style={{ padding: "0.35rem 0.75rem", border: "none", cursor: "pointer",
@@ -1257,7 +1462,8 @@ function TabEventos() {
 
       {/* Panel lateral derecho */}
       {panelAbierto && (
-        <div style={s.panel}>
+        <div style={s.panelOverlay} onClick={cerrarPanel}>
+          <div style={s.panel} onClick={(e) => e.stopPropagation()}>
             <div style={s.panelHeader}>
               <div>
                 <h2 style={{ margin: 0, color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
@@ -1267,7 +1473,7 @@ function TabEventos() {
                   Excepción institucional — suspende clases individualmente
                 </p>
               </div>
-              <button onClick={cerrarPanel} style={s.panelBtnClose} title="Cerrar">✕</button>
+              <button type="button" onClick={cerrarPanel} style={s.panelBtnClose} title="Cerrar">✕</button>
             </div>
 
             <div style={s.panelBody}>
@@ -1384,18 +1590,19 @@ function TabEventos() {
                   </p>
                 )}
 
-                <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
+                <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", flexWrap: "wrap" }}>
                   <button type="button" onClick={cerrarPanel}
-                    style={{ ...s.btnSecundario, flex: 1 }} disabled={guardando}>
+                    style={{ ...s.btnSecundario, flex: 1, minHeight: 42 }} disabled={guardando}>
                     Cancelar
                   </button>
-                  <button type="submit" className="btn-primary" style={{ flex: 2 }} disabled={guardando}>
+                  <button type="submit" className="btn-primary" style={{ flex: 2, minHeight: 42 }} disabled={guardando}>
                     {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Crear evento"}
                   </button>
                 </div>
               </form>
             </div>
           </div>
+        </div>
       )}
 
       {detalleId && (
@@ -1607,9 +1814,9 @@ function SuspenderJornadaModal({ onClose, onExito }) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.75rem" }}>
-            <button type="button" style={{ ...s.btnSecundario, flex: 1 }} onClick={onClose} disabled={enviando}>Cancelar</button>
-            <button type="submit" className="btn-primary" style={{ flex: 2 }} disabled={enviando}>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
+            <button type="button" style={{ ...s.btnSecundario, flex: "1 1 110px", minHeight: 42 }} onClick={onClose} disabled={enviando}>Cancelar</button>
+            <button type="submit" className="btn-primary" style={{ flex: "2 1 160px", minHeight: 42 }} disabled={enviando}>
               {enviando ? "Suspendiendo..." : "Confirmar suspensión"}
             </button>
           </div>
@@ -1681,8 +1888,10 @@ function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, e
         <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-        {dias.map((dia, i) => {
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
+        <div style={{ minWidth: 680 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+            {dias.map((dia, i) => {
           const diaISO        = toISODate(dia);
           const esHoy         = diaISO === hoyISO;
           const esPasado      = diaISO < hoyISO;
@@ -1762,6 +1971,8 @@ function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, e
             </div>
           );
         })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1790,173 +2001,233 @@ function minToHHMM(m) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-function VistaCalendarioBloques({ bloques, onEditar, onEliminar, eliminando, preview }) {
+function VistaCalendarioBloques({ bloques, parametros, onEditar, onEliminar, eliminando, preview }) {
   const [hovered, setHovered] = useState(null);
 
+  const iniParam = hhmm(parametros?.Parametro_Institucional_Inicio_Jornada);
+  const finParam = hhmm(parametros?.Parametro_Institucional_Fin_Jornada);
+  const pIniMin  = iniParam ? toMin(iniParam) : null;
+  const pFinMin  = finParam && (!pIniMin || toMin(finParam) > pIniMin) ? toMin(finParam) : null;
+
+  const listaBloques = Array.isArray(bloques) ? bloques : [];
   const todosStarts = [
-    ...bloques.map(b => toMin(b.Bloque_Horario_Hora_Inicio)),
+    ...listaBloques.map(b => toMin(b.Bloque_Horario_Hora_Inicio)),
     ...(preview ? [toMin(preview.hora_inicio)] : []),
+    ...(pIniMin != null ? [pIniMin] : []),
   ];
   const todosEnds = [
-    ...bloques.map(b => toMin(b.Bloque_Horario_Hora_Fin)),
+    ...listaBloques.map(b => toMin(b.Bloque_Horario_Hora_Fin)),
     ...(preview ? [toMin(preview.hora_fin)] : []),
+    ...(pFinMin != null ? [pFinMin] : []),
   ];
 
   if (!todosStarts.length) return null;
 
   const rangoMin = Math.floor(Math.min(...todosStarts) / 60) * 60;
   const rangoMax = Math.ceil(Math.max(...todosEnds) / 60) * 60;
-  const totalMin = rangoMax - rangoMin;
+  const totalMin = Math.max(rangoMax - rangoMin, 60);
   const totalPx  = totalMin * PX_POR_MIN;
 
-  const horas   = Array.from({ length: totalMin / 60 + 1 }, (_, i) => rangoMin + i * 60);
+  const horas   = Array.from({ length: Math.floor(totalMin / 60) + 1 }, (_, i) => rangoMin + i * 60);
   const diasAbr = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-      {/* Encabezados */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb" }}>
-        <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid #e5e7eb" }} />
-        {diasAbr.map((d, i) => (
-          <div key={d} style={{
-            flex: 1, padding: "10px 0", textAlign: "center",
-            background: preview ? "#fff7ed" : "#f8fafc",
-            borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
-            fontWeight: 700, fontSize: "0.82rem",
-            color: preview ? "#c2410c" : "#1e3a5f",
-            textTransform: "uppercase", letterSpacing: "0.05em",
-          }}>
-            {d}
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff", width: "100%" }}>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
+        <div style={{ minWidth: 640 }}>
+          {/* Encabezados */}
+          <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb" }}>
+            <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid #e5e7eb" }} />
+            {diasAbr.map((d, i) => (
+              <div key={d} style={{
+                flex: 1, padding: "10px 0", textAlign: "center",
+                background: preview ? "#fff7ed" : "#f8fafc",
+                borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
+                fontWeight: 700, fontSize: "0.82rem",
+                color: preview ? "#c2410c" : "#1e3a5f",
+                textTransform: "uppercase", letterSpacing: "0.05em",
+              }}>
+                {d}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Cuerpo */}
-      <div style={{ display: "flex" }}>
-        {/* Etiquetas de hora */}
-        <div style={{ width: 56, flexShrink: 0, position: "relative", height: totalPx,
-          borderRight: "1px solid #e5e7eb", background: "#fff" }}>
-          {horas.map(m => (
-            <div key={m} style={{
-              position: "absolute", top: (m - rangoMin) * PX_POR_MIN - 7,
-              right: 8, fontSize: "0.7rem", color: "#9ca3af", fontWeight: 600, lineHeight: 1,
-            }}>
-              {minToHHMM(m)}
+          {/* Cuerpo */}
+          <div style={{ display: "flex" }}>
+            {/* Etiquetas de hora */}
+            <div style={{ width: 56, flexShrink: 0, position: "relative", height: totalPx,
+              borderRight: "1px solid #e5e7eb", background: "#fff" }}>
+              {horas.map(m => (
+                <div key={m} style={{
+                  position: "absolute", top: (m - rangoMin) * PX_POR_MIN - 7,
+                  right: 8, fontSize: "0.7rem", color: "#9ca3af", fontWeight: 600, lineHeight: 1,
+                }}>
+                  {minToHHMM(m)}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Columnas de días (todos ven los mismos bloques — plantilla diaria) */}
-        {diasAbr.map((d, di) => (
-          <div key={d} style={{
-            flex: 1, position: "relative", height: totalPx,
-            borderLeft: di > 0 ? "1px solid #e5e7eb" : "none",
-            background: "#fafafa",
-          }}>
-            {horas.map(m => (
-              <div key={m} style={{ position: "absolute", top: (m - rangoMin) * PX_POR_MIN,
-                left: 0, right: 0, height: 1, background: "#e5e7eb" }} />
-            ))}
-            {horas.slice(0, -1).map(m => (
-              <div key={`h${m}`} style={{ position: "absolute", top: (m + 30 - rangoMin) * PX_POR_MIN,
-                left: 0, right: 0, height: 1, background: "#f3f4f6" }} />
-            ))}
+            {/* Columnas de días (todos ven los mismos bloques — plantilla diaria) */}
+            {diasAbr.map((d, di) => (
+              <div key={d} style={{
+                flex: 1, position: "relative", height: totalPx,
+                borderLeft: di > 0 ? "1px solid #e5e7eb" : "none",
+                background: "#fafafa",
+              }}>
+                {horas.map(m => (
+                  <div key={m} style={{ position: "absolute", top: (m - rangoMin) * PX_POR_MIN,
+                    left: 0, right: 0, height: 1, background: "#e5e7eb" }} />
+                ))}
+                {horas.slice(0, -1).map(m => (
+                  <div key={`h${m}`} style={{ position: "absolute", top: (m + 30 - rangoMin) * PX_POR_MIN,
+                    left: 0, right: 0, height: 1, background: "#f3f4f6" }} />
+                ))}
 
-            {/* Bloques existentes */}
-            {bloques.map(b => {
-              const sMin   = toMin(b.Bloque_Horario_Hora_Inicio);
-              const eMin   = toMin(b.Bloque_Horario_Hora_Fin);
-              const top    = (sMin - rangoMin) * PX_POR_MIN;
-              const h      = Math.max((eMin - sMin) * PX_POR_MIN - 3, 22);
-              const desajustado = Number(b.desajustado) === 1;
-              const col    = desajustado ? COLOR_DESAJUSTADO : TIPO_COLORES[b.Bloque_Horario_Tipo] || TIPO_COLORES["Clase"];
-              const dur    = eMin - sMin;
-              const hovKey = `${b.Bloque_Horario_Id}-${di}`;
-              const isHov  = hovered === hovKey;
-
-              return (
-                <div key={b.Bloque_Horario_Id}
-                  onMouseEnter={() => setHovered(hovKey)}
-                  onMouseLeave={() => setHovered(null)}
-                  title={desajustado ? `⚠ ${b.motivo_desajuste} · ${b.clases} clase(s) por reubicar` : undefined}
-                  style={{
-                    position: "absolute", top, left: desajustado ? "50%" : 5, right: 5, height: h,
-                    background: col.bg, border: `1px solid ${col.borde}`,
-                    borderLeft: `3px solid ${col.acento}`,
-                    borderRadius: 6, padding: "2px 5px 2px 6px",
-                    overflow: "hidden", cursor: "pointer",
-                    zIndex: isHov ? 10 : 1,
-                    boxShadow: isHov ? "0 3px 10px rgba(0,0,0,0.12)" : "none",
-                    transition: "box-shadow 0.15s",
+                {/* Franjas fuera de la jornada configurada */}
+                {pIniMin != null && pIniMin > rangoMin && (
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0,
+                    height: (pIniMin - rangoMin) * PX_POR_MIN,
+                    background: "rgba(226, 232, 240, 0.55)", pointerEvents: "none",
+                  }} />
+                )}
+                {pFinMin != null && pFinMin < rangoMax && (
+                  <div style={{
+                    position: "absolute", top: (pFinMin - rangoMin) * PX_POR_MIN,
+                    bottom: 0, left: 0, right: 0,
+                    background: "rgba(226, 232, 240, 0.55)", pointerEvents: "none",
+                  }} />
+                )}
+                {pIniMin != null && (
+                  <div style={{
+                    position: "absolute", top: (pIniMin - rangoMin) * PX_POR_MIN,
+                    left: 0, right: 0, borderTop: "1px dashed #3b82f6", pointerEvents: "none", zIndex: 2,
                   }}>
-                  <div style={{ display: "flex", height: "100%", justifyContent: "space-between" }}>
-                    <div style={{ flex: 1, overflow: "hidden", minWidth: 0 }} onClick={() => onEditar(b)}>
-                      <div style={{ fontWeight: 700, fontSize: "0.7rem", color: col.acento,
-                        lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
-                        {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)}
+                    {di === 0 && (
+                      <span style={{
+                        position: "absolute", top: 2, left: 4, fontSize: "0.6rem",
+                        fontWeight: 700, color: "#1d4ed8", background: "rgba(239,246,255,0.92)",
+                        padding: "0 4px", borderRadius: 3,
+                      }}>
+                        Inicio {iniParam}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {pFinMin != null && (
+                  <div style={{
+                    position: "absolute", top: (pFinMin - rangoMin) * PX_POR_MIN,
+                    left: 0, right: 0, borderTop: "1px dashed #3b82f6", pointerEvents: "none", zIndex: 2,
+                  }}>
+                    {di === 0 && (
+                      <span style={{
+                        position: "absolute", top: -13, left: 4, fontSize: "0.6rem",
+                        fontWeight: 700, color: "#1d4ed8", background: "rgba(239,246,255,0.92)",
+                        padding: "0 4px", borderRadius: 3,
+                      }}>
+                        Fin {finParam}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Bloques existentes */}
+                {listaBloques.map(b => {
+                  const sMin   = toMin(b.Bloque_Horario_Hora_Inicio);
+                  const eMin   = toMin(b.Bloque_Horario_Hora_Fin);
+                  const top    = (sMin - rangoMin) * PX_POR_MIN;
+                  const h      = Math.max((eMin - sMin) * PX_POR_MIN - 3, 22);
+                  const desajustado = Number(b.desajustado) === 1;
+                  const col    = desajustado ? COLOR_DESAJUSTADO : TIPO_COLORES[b.Bloque_Horario_Tipo] || TIPO_COLORES["Clase"];
+                  const dur    = eMin - sMin;
+                  const hovKey = `${b.Bloque_Horario_Id}-${di}`;
+                  const isHov  = hovered === hovKey;
+
+                  return (
+                    <div key={b.Bloque_Horario_Id}
+                      onMouseEnter={() => setHovered(hovKey)}
+                      onMouseLeave={() => setHovered(null)}
+                      title={desajustado ? `⚠ ${b.motivo_desajuste} · ${b.clases} clase(s) por reubicar` : undefined}
+                      style={{
+                        position: "absolute", top, left: desajustado ? "50%" : 5, right: 5, height: h,
+                        background: col.bg, border: `1px solid ${col.borde}`,
+                        borderLeft: `3px solid ${col.acento}`,
+                        borderRadius: 6, padding: "2px 5px 2px 6px",
+                        overflow: "hidden", cursor: "pointer",
+                        zIndex: isHov ? 10 : 3,
+                        boxShadow: isHov ? "0 3px 10px rgba(0,0,0,0.12)" : "none",
+                        transition: "box-shadow 0.15s",
+                      }}>
+                      <div style={{ display: "flex", height: "100%", justifyContent: "space-between" }}>
+                        <div style={{ flex: 1, overflow: "hidden", minWidth: 0 }} onClick={() => onEditar(b)}>
+                          <div style={{ fontWeight: 700, fontSize: "0.7rem", color: col.acento,
+                            lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
+                            {hhmm(b.Bloque_Horario_Hora_Inicio)}–{hhmm(b.Bloque_Horario_Hora_Fin)}
+                          </div>
+                          {h > 32 && (
+                            <div style={{ fontSize: "0.65rem", color: col.acento, opacity: 0.8 }}>
+                              {desajustado
+                                ? `⚠ ${b.clases} clase(s) por reubicar`
+                                : `${col.icono} ${b.Bloque_Horario_Tipo} · ${dur} min`}
+                            </div>
+                          )}
+                        </div>
+                        {isHov && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 3, flexShrink: 0 }}>
+                            <button title="Editar" onClick={e => { e.stopPropagation(); onEditar(b); }}
+                              style={{ width: 18, height: 18, padding: 0, border: "none", borderRadius: 4,
+                                cursor: "pointer", background: col.acento, color: "#fff",
+                                fontSize: "0.6rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>
+                            <button title="Eliminar" disabled={eliminando === b.Bloque_Horario_Id}
+                              onClick={e => { e.stopPropagation(); if (window.confirm("¿Eliminar este bloque?")) onEliminar(b.Bloque_Horario_Id); }}
+                              style={{ width: 18, height: 18, padding: 0, border: "none", borderRadius: 4,
+                                cursor: "pointer", background: "#dc2626", color: "#fff",
+                                fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                          </div>
+                        )}
                       </div>
-                      {h > 32 && (
-                        <div style={{ fontSize: "0.65rem", color: col.acento, opacity: 0.8 }}>
-                          {desajustado
-                            ? `⚠ ${b.clases} clase(s) por reubicar`
-                            : `${col.icono} ${b.Bloque_Horario_Tipo} · ${dur} min`}
+                    </div>
+                  );
+                })}
+
+                {/* ── Preview naranja (aparece en TODAS las columnas) ── */}
+                {preview && (() => {
+                  const sMin = toMin(preview.hora_inicio);
+                  const eMin = toMin(preview.hora_fin);
+                  if (eMin <= sMin) return null;
+                  const top = (sMin - rangoMin) * PX_POR_MIN;
+                  const h   = Math.max((eMin - sMin) * PX_POR_MIN - 3, 22);
+                  const dur = eMin - sMin;
+                  return (
+                    <div key="preview" style={{
+                      position: "absolute", top, left: 5, right: 5, height: h,
+                      background: "rgba(251, 146, 60, 0.18)",
+                      border: "2px dashed #f97316",
+                      borderLeft: "3px solid #ea580c",
+                      borderRadius: 6, padding: "2px 5px 2px 6px",
+                      overflow: "hidden", zIndex: 20, pointerEvents: "none",
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: "0.7rem", color: "#c2410c",
+                        lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
+                        {preview.hora_inicio}–{preview.hora_fin}
+                      </div>
+                      {h > 28 && (
+                        <div style={{ fontSize: "0.65rem", color: "#ea580c", opacity: 0.9 }}>
+                          {preview.tipo} · {dur} min
+                        </div>
+                      )}
+                      {h > 44 && (
+                        <div style={{ fontSize: "0.6rem", color: "#9a3412", fontStyle: "italic" }}>
+                          Vista previa
                         </div>
                       )}
                     </div>
-                    {isHov && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 3, flexShrink: 0 }}>
-                        <button title="Editar" onClick={e => { e.stopPropagation(); onEditar(b); }}
-                          style={{ width: 18, height: 18, padding: 0, border: "none", borderRadius: 4,
-                            cursor: "pointer", background: col.acento, color: "#fff",
-                            fontSize: "0.6rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>
-                        <button title="Eliminar" disabled={eliminando === b.Bloque_Horario_Id}
-                          onClick={e => { e.stopPropagation(); if (window.confirm("¿Eliminar este bloque?")) onEliminar(b.Bloque_Horario_Id); }}
-                          style={{ width: 18, height: 18, padding: 0, border: "none", borderRadius: 4,
-                            cursor: "pointer", background: "#dc2626", color: "#fff",
-                            fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* ── Preview naranja (aparece en TODAS las columnas) ── */}
-            {preview && (() => {
-              const sMin = toMin(preview.hora_inicio);
-              const eMin = toMin(preview.hora_fin);
-              if (eMin <= sMin) return null;
-              const top = (sMin - rangoMin) * PX_POR_MIN;
-              const h   = Math.max((eMin - sMin) * PX_POR_MIN - 3, 22);
-              const dur = eMin - sMin;
-              return (
-                <div key="preview" style={{
-                  position: "absolute", top, left: 5, right: 5, height: h,
-                  background: "rgba(251, 146, 60, 0.18)",
-                  border: "2px dashed #f97316",
-                  borderLeft: "3px solid #ea580c",
-                  borderRadius: 6, padding: "2px 5px 2px 6px",
-                  overflow: "hidden", zIndex: 20, pointerEvents: "none",
-                }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.7rem", color: "#c2410c",
-                    lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden" }}>
-                    {preview.hora_inicio}–{preview.hora_fin}
-                  </div>
-                  {h > 28 && (
-                    <div style={{ fontSize: "0.65rem", color: "#ea580c", opacity: 0.9 }}>
-                      {preview.tipo} · {dur} min
-                    </div>
-                  )}
-                  {h > 44 && (
-                    <div style={{ fontSize: "0.6rem", color: "#9a3412", fontStyle: "italic" }}>
-                      Vista previa
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                  );
+                })()}
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -1975,16 +2246,16 @@ function StatMini({ label, value, color, bg }) {
 
 /* ── Estilos ───────────────────────────────────────────────────── */
 const s = {
-  page:     { padding: "1.75rem" },
+  page:     { padding: "clamp(0.85rem, 3vw, 1.75rem)" },
   header:   { display: "flex", justifyContent: "space-between", alignItems: "flex-start",
     marginBottom: "1.5rem", gap: "1rem", flexWrap: "wrap" },
-  titulo:   { margin: 0, color: "#1e3a5f", fontSize: "1.5rem" },
+  titulo:   { margin: 0, color: "#1e3a5f", fontSize: "clamp(1.25rem, 3.5vw, 1.5rem)" },
   subtitulo:{ margin: "0.3rem 0 0 0", color: "#6b7280", fontSize: "0.9rem" },
   rolBadge: { padding: "4px 14px", borderRadius: 20, fontSize: "0.82rem", fontWeight: 700,
     background: "#dbeafe", color: "#1e40af", border: "1px solid #93c5fd", flexShrink: 0 },
 
   tabBar:      { display: "flex", gap: "0.25rem", borderBottom: "2px solid #e5e7eb",
-    marginBottom: "1.75rem", flexWrap: "wrap" },
+    marginBottom: "1.5rem", flexWrap: "wrap" },
   tabBtn:      { padding: "0.6rem 1.1rem", border: "none", background: "transparent",
     cursor: "pointer", fontSize: "0.9rem", color: "#6b7280", borderRadius: "8px 8px 0 0",
     fontWeight: 500, transition: "all .15s" },
@@ -2002,10 +2273,13 @@ const s = {
   formField:{ flex: "1 1 160px", display: "flex", flexDirection: "column" },
   label:   { fontWeight: 600, fontSize: "0.875rem", color: "#374151", marginBottom: "0.3rem" },
   input:   { padding: "0.45rem 0.65rem", borderRadius: 6, border: "1px solid #d1d5db",
-    fontSize: "0.9rem", boxSizing: "border-box", width: "100%" },
+    fontSize: "0.9rem", boxSizing: "border-box", width: "100%", minWidth: 0, minHeight: 40 },
   resumenBox: { background: "#f0f4ff", border: "1px solid #dbeafe", borderRadius: 8,
     padding: "0.9rem 1.1rem", marginBottom: "0.5rem" },
   resumenList:{ margin: "0.3rem 0 0 1rem", padding: 0, fontSize: "0.85rem", color: "#374151" },
+  paramStrip: { display: "flex", flexWrap: "wrap", gap: "0.35rem 0.7rem", alignItems: "center",
+    background: "#f0f4ff", border: "1px solid #dbeafe", borderRadius: 8,
+    padding: "0.55rem 0.9rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#1e3a5f" },
 
   statsRow:   { display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" },
   tabla:      { width: "100%", borderCollapse: "collapse", minWidth: 560 },
@@ -2034,10 +2308,14 @@ const s = {
     justifyContent: "center", padding: "4rem 2rem", textAlign: "center" },
 
   /* Panel lateral */
+  panelOverlay: {
+    position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.45)",
+    zIndex: 1050, display: "flex", justifyContent: "flex-end",
+  },
   panel: {
-    position: "fixed", top: 0, right: 0, width: "min(440px, 100vw)", height: "100dvh",
+    position: "relative", width: "min(440px, 100vw)", height: "100dvh",
     background: "#fff", boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
-    zIndex: 1050, display: "flex", flexDirection: "column",
+    zIndex: 1051, display: "flex", flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },
   panelHeader: {
@@ -2045,9 +2323,9 @@ const s = {
     display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
   },
   panelBtnClose: {
-    background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
-    color: "#fff", borderRadius: "6px", width: 32, height: 32,
-    cursor: "pointer", fontSize: "0.9rem", display: "flex",
+    background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.22)",
+    color: "#fff", borderRadius: "8px", width: 40, height: 40, minWidth: 40, minHeight: 40,
+    cursor: "pointer", fontSize: "1.1rem", display: "flex",
     alignItems: "center", justifyContent: "center",
   },
   panelBody: { flex: 1, overflowY: "auto", padding: "1.25rem" },
@@ -2058,6 +2336,6 @@ const s = {
   },
   inputPanel: {
     width: "100%", padding: "0.45rem 0.6rem", borderRadius: "6px",
-    border: "1px solid #d1d5db", boxSizing: "border-box", fontSize: "0.9rem",
+    border: "1px solid #d1d5db", boxSizing: "border-box", fontSize: "0.9rem", minHeight: 40,
   },
 };

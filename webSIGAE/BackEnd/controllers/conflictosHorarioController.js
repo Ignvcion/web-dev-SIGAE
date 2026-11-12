@@ -322,13 +322,21 @@ const eliminarClase = async (req, res) => {
   }
 };
 
+const horaCompleta = (hora) => {
+  const [h = '00', m = '00', s = '00'] = String(hora || '').trim().split(':');
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${s.padStart(2, '0')}`;
+};
+
+const esHoraValida = (hora) =>
+  typeof hora === 'string' && /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(hora.trim());
+
 // ── POST /api/bloques/parametros/impacto ─────────────────────────────────
 // Antes de guardar una nueva jornada: qué bloques con clases quedarían fuera.
 const getImpactoParametros = async (req, res) => {
   const inicio = req.body?.Parametro_Institucional_Inicio_Jornada;
   const fin = req.body?.Parametro_Institucional_Fin_Jornada;
 
-  if (!inicio || !fin || inicio >= fin) {
+  if (!inicio || !fin || !esHoraValida(inicio) || !esHoraValida(fin) || horaCompleta(inicio) >= horaCompleta(fin)) {
     return res.status(400).json({ error: 'El inicio de jornada debe ser anterior al fin' });
   }
 
