@@ -2389,6 +2389,23 @@ body.bloques-panel-open .main-content {
   flex: 1;
 }
 
+.cit-estudiante-resumen {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.cit-estudiante-resumen span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
 .cit-resumen {
   display: flex;
   gap: 12px;
@@ -2469,6 +2486,7 @@ body.bloques-panel-open .main-content {
 .cit-timeline li {
   position: relative;
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .cit-timeline li::before {
@@ -3551,13 +3569,41 @@ body {
     min-height: 42px;
   }
 
-  .cit-select-auto {
+  .cit-header > .cit-link-btn {
     width: 100%;
+    text-align: center;
+  }
+
+  .cit-select-auto,
+  .cit-select-estudiante {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cit-resumen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .cit-stat {
-    flex: 1 1 110px;
     min-width: 0;
+    padding: 12px 14px;
+  }
+
+  .cit-resumen .cit-stat:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .cit-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cit-toolbar .cit-select-auto,
+  .cit-toolbar button {
+    width: 100%;
+    min-height: 42px;
   }
 
   .modal-header .btn-cerrar {
@@ -3751,6 +3797,97 @@ body {
 
   .est-acciones .btn-roles {
     flex: 1 1 0;
+    min-height: 40px;
+    text-align: center;
+  }
+
+  .cit-tabla-wrap {
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .tabla-usuarios.cit-tabla-historial {
+    display: block;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .tabla-usuarios.cit-tabla-historial thead {
+    display: none;
+  }
+
+  .tabla-usuarios.cit-tabla-historial tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tabla-usuarios.cit-tabla-historial tr {
+    display: block;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  }
+
+  .tabla-usuarios.cit-tabla-historial tr:hover td {
+    background: transparent;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: normal;
+    text-align: right;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td::before {
+    content: attr(data-label);
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td.cit-celda-texto {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td.cit-hist-docente,
+  .tabla-usuarios.cit-tabla-historial td.cit-hist-estado {
+    align-items: center;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td.cit-hist-acciones {
+    border-bottom: none;
+    padding-top: 10px;
+    padding-bottom: 2px;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td.cit-hist-acciones::before {
+    display: none;
+  }
+
+  .tabla-usuarios.cit-tabla-historial td.cit-hist-acciones .btn-roles {
+    width: 100%;
     min-height: 40px;
     text-align: center;
   }
