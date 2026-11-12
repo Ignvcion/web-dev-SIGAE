@@ -3248,6 +3248,206 @@ body {
   }
 }
 
+/* Consulta de Horarios (CU67 / CU68) */
+.ch-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.ch-tab-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #fff;
+  color: #4f46e5;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.ch-tab-btn--activa {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.ch-filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.ch-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ch-campo label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ch-campo-error {
+  font-size: 0.76rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.ch-fecha-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ch-input-date {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: #fff;
+  color: #1e293b;
+  color-scheme: light;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.ch-input-date:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.ch-btn-quitar-fecha {
+  flex: 0 0 auto;
+  padding: 0 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ch-btn-quitar-fecha:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.ch-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.ch-curso-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ch-libres-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ch-libre-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.ch-libre-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.ch-libre-dia {
+  font-weight: 700;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+.ch-libre-fecha {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.ch-libre-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ch-libre-pill {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .ch-filtros-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .ch-tabs .ch-tab-btn {
+    flex: 1 1 140px;
+    min-height: 44px;
+    text-align: center;
+  }
+
+  .ch-acciones button {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+
+  .ch-input-date,
+  .ch-filtros-grid .usuarios-select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .ch-btn-quitar-fecha {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ch-tabla-filtrar .est-col-acciones button,
+  .ch-tabla-filtrar .est-col-acciones a {
+    width: 100%;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+}
+
 /* Pantalla 4: Citaciones, filtros y modales compartidos */
 .cit-form-fila > *,
 .campo-pwd {
