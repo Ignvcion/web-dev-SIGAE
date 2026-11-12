@@ -10,8 +10,10 @@ import {
 import {
   MAX_MOTIVO,
   TRAMOS_HORARIOS,
+  descripcionEstadoDetalle,
   esCancelada,
   esEditable,
+  esTramoPasadoHoy,
   fechaISO,
   formatearFecha,
   hoyISO,
@@ -191,7 +193,12 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
           <>
             <dl className="cit-detalle">
               <dt>Estado</dt>
-              <dd><EstadoCitacionBadge citacion={citacion} /> <span className="cit-estado-raw">{citacion.Citacion_Estado}</span></dd>
+              <dd>
+                <EstadoCitacionBadge citacion={citacion} />
+                {descripcionEstadoDetalle(citacion) && (
+                  <span className="cit-estado-raw">{descripcionEstadoDetalle(citacion)}</span>
+                )}
+              </dd>
               <dt>Fecha</dt>
               <dd>{formatearFecha(citacion.Citacion_Fecha)}</dd>
               <dt>Tramo horario</dt>
@@ -324,7 +331,12 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                   min={hoyISO()}
                   value={reprog.fecha}
                   onChange={(e) => {
-                    setReprog((r) => ({ ...r, fecha: e.target.value }));
+                    const nuevaFecha = e.target.value;
+                    setReprog((r) => ({
+                      ...r,
+                      fecha: nuevaFecha,
+                      tramo: r.tramo && esTramoPasadoHoy(nuevaFecha, r.tramo) ? "" : r.tramo,
+                    }));
                     setErroresReprog((er) => ({ ...er, fecha: undefined }));
                     setMsgError("");
                   }}
@@ -344,9 +356,14 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                   }}
                 >
                   <option value="">Selecciona un tramo...</option>
-                  {TRAMOS_HORARIOS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+                  {TRAMOS_HORARIOS.map((t) => {
+                    const pasado = esTramoPasadoHoy(reprog.fecha, t);
+                    return (
+                      <option key={t} value={t} disabled={pasado}>
+                        {pasado ? `${t} (pasado)` : t}
+                      </option>
+                    );
+                  })}
                 </select>
                 {erroresReprog.tramo && <span className="pwd-error">{erroresReprog.tramo}</span>}
               </div>

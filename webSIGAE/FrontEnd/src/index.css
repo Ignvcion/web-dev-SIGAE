@@ -2236,6 +2236,8 @@ body.bloques-panel-open .main-content {
 .cit-card-futura     { border-left-color: #2563eb; }
 .cit-card-confirmada { border-left-color: #16a34a; }
 .cit-card-cancelada  { border-left-color: #dc2626; opacity: 0.8; }
+.cit-card-pasada     { opacity: 0.78; }
+.cit-card-pasada .cit-card-tramo { color: #64748b; }
 
 .cit-card-tramo {
   font-weight: 600;
@@ -3456,17 +3458,26 @@ body {
 
 @media (max-width: 640px) {
   .modal-overlay {
-    padding: 12px;
-    padding-top: calc(64px + var(--sat));
-    padding-bottom: max(20px, var(--sab));
-    align-items: flex-start;
+    padding: max(16px, var(--sat)) 12px max(20px, var(--sab));
+    align-items: center;
     overflow-y: auto;
   }
 
   .modal-card,
   .modal-card.modal-card-ancho {
     padding: 20px 16px;
-    max-height: calc(100dvh - 84px - var(--sat));
+    max-height: calc(100dvh - 36px - var(--sat) - var(--sab));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cit-detalle {
+    gap: 2px 0;
+    margin-bottom: 12px;
+  }
+
+  .cit-detalle dt {
+    margin-top: 6px;
   }
 
   .modal-actions {

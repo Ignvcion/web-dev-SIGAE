@@ -164,11 +164,35 @@ export function validarFechaTramo({ fecha = "", tramo = "" }) {
 
   if (!tramo) errores.tramo = "El tramo horario es obligatorio";
   else if (!TRAMOS_HORARIOS.includes(tramo)) errores.tramo = "Tramo horario inválido";
-  else if (fecha === hoyISO()) {
-    const ini = minutosInicioTramo(tramo);
-    if (ini <= minutosAhora()) errores.tramo = "El tramo horario seleccionado ya pasó";
-  }
+  else if (esTramoPasadoHoy(fecha, tramo)) errores.tramo = "El tramo horario seleccionado ya pasó";
   return errores;
+}
+
+// True cuando la fecha corresponde a hoy y el tramo horario ya comenzó (o terminó)
+export function esTramoPasadoHoy(fecha, tramo) {
+  const iso = fechaISO(fecha);
+  if (!iso || iso !== hoyISO()) return false;
+  if (!/^\d{1,2}:\d{2}/.test(String(tramo || ""))) return false;
+  return minutosInicioTramo(tramo) <= minutosAhora();
+}
+
+// Texto complementario para el detalle/historial sin duplicar la etiqueta del badge
+export function descripcionEstadoDetalle(c) {
+  if (!c) return "";
+  const cat = categoriaCitacion(c);
+  if (cat === "pendiente") {
+    if (yaPasoCitacion(c)) return "Sin confirmar · Horario vencido";
+    if (c.Requiere_Confirmacion_De === "Docente") return "Esperando confirmación del docente";
+    if (c.Requiere_Confirmacion_De === "Apoderado") return "Esperando confirmación del apoderado";
+    const raw = String(c.Citacion_Estado || "").trim();
+    if (!raw || raw.toLowerCase() === "pendiente") return "Pendiente de confirmación";
+    return raw;
+  }
+  if (cat === "futura") return "Confirmada";
+  const raw = String(c.Citacion_Estado || "").trim();
+  const etiqueta = ETIQUETAS_CATEGORIA[cat];
+  if (!raw || raw.toLowerCase() === String(etiqueta || "").toLowerCase()) return "";
+  return raw;
 }
 
 // CU74 - Excepción 1: datos incompletos o inválidos en el formulario de citación

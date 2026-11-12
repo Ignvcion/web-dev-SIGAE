@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 import { getContactosApoderados } from "../../services/api";
 
 function FilaContacto({ apoderado, etiqueta }) {
+  const correo =
+    apoderado.Usuario_Correo ||
+    apoderado.Apoderado_Correo_Natural ||
+    apoderado.Docente_Correo_Institucional ||
+    apoderado.Administrador_Correo_Institucional ||
+    "";
   return (
     <li className="contacto-item">
       <div className="contacto-nombre">
@@ -9,8 +15,8 @@ function FilaContacto({ apoderado, etiqueta }) {
         <span className={`contacto-rol contacto-rol-${etiqueta.toLowerCase()}`}>{etiqueta}</span>
       </div>
       <div className="contacto-datos">
-        {apoderado.Usuario_Correo ? (
-          <a href={`mailto:${apoderado.Usuario_Correo}`}>{apoderado.Usuario_Correo}</a>
+        {correo ? (
+          <a href={`mailto:${correo}`}>{correo}</a>
         ) : (
           <span className="dato-sin-registrar">Sin correo registrado</span>
         )}

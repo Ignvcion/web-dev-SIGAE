@@ -9,6 +9,7 @@ import {
 import {
   CATEGORIAS_AGENDA,
   categoriaCitacion,
+  descripcionEstadoDetalle,
   esCancelada,
   formatearFecha,
   formatearFechaHora,
@@ -299,7 +300,12 @@ function HistorialCitaciones() {
 
             <dl className="cit-detalle">
               <dt>Estado</dt>
-              <dd><EstadoCitacionBadge citacion={seleccionada} /> <span className="cit-estado-raw">{seleccionada.Citacion_Estado}</span></dd>
+              <dd>
+                <EstadoCitacionBadge citacion={seleccionada} />
+                {descripcionEstadoDetalle(seleccionada) && (
+                  <span className="cit-estado-raw">{descripcionEstadoDetalle(seleccionada)}</span>
+                )}
+              </dd>
               <dt>Fecha</dt>
               <dd>{formatearFecha(seleccionada.Citacion_Fecha)}</dd>
               <dt>Tramo horario</dt>
