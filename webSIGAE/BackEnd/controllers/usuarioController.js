@@ -1165,11 +1165,14 @@ const getDocentes = async (req, res) => {
     const params = [];
 
     // Filtros opcionales (CU31: nombre, RUT o especialidad)
-    const criterioBusqueda = req.query.criterio || req.query.q || req.query.especialidad;
+    const criterioBusqueda = req.query.criterio || req.query.q;
     if (criterioBusqueda && criterioBusqueda.trim() !== '') {
       const term = `%${criterioBusqueda.trim()}%`;
       sql += ' AND (Docente_Especialidad LIKE ? OR Usuario_Nombre_Completo LIKE ? OR Usuario_RUT LIKE ?)';
       params.push(term, term, term);
+    } else if (especialidad && especialidad.trim() !== '') {
+      sql += ' AND Docente_Especialidad LIKE ?';
+      params.push(`%${especialidad.trim()}%`);
     }
 
     // Etiqueta exacta del catálogo de especialidades

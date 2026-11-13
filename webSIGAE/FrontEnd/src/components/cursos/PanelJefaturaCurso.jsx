@@ -17,7 +17,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
   const [estudiantes, setEstudiantes] = useState([]);
   const [mensajeEstudiantes, setMensajeEstudiantes] = useState("");
   const [cursoCargado, setCursoCargado] = useState(null);
-  const cargandoEstudiantes = Boolean(curso?.Curso_Id) && cursoCargado !== curso.Curso_Id;
+  const cargandoEstudiantes = Boolean(curso?.Curso_Id) && Number(cursoCargado) !== Number(curso?.Curso_Id);
   const [permiteRuta, setPermiteRuta] = useState(false);
   const [seleccion, setSeleccion] = useState([]);
   const [ruta, setRuta] = useState("");
@@ -42,7 +42,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
         setMensajeEstudiantes(e?.message || "No fue posible cargar los estudiantes del curso.");
       })
       .finally(() => {
-        if (vivo) setCursoCargado(curso.Curso_Id);
+        if (vivo) setCursoCargado(Number(curso.Curso_Id));
       });
     if (esAdmin) {
       getDocentesActivos().then((d) => vivo && d && setDocentes(d)).catch(() => {});
