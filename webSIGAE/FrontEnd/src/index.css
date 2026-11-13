@@ -1936,6 +1936,24 @@ select {
   to   { transform: rotate(360deg); }
 }
 
+.calendario-eventos-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.calendario-eventos-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.calendario-eventos-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.calendario-eventos-scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
 .sidebar {
   transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease;
 }

@@ -1834,6 +1834,7 @@ const IMPACTO_COLORES = {
   "Salida anticipada": { bg: "#fefce8", borde: "#eab308", acento: "#92400e", icono: "⚠" },
   "Suspensión total":  { bg: "#fef2f2", borde: "#ef4444", acento: "#991b1b", icono: "🚫" },
   "Suspensión jornada mañana": { bg: "#fff7ed", borde: "#f97316", acento: "#9a3412", icono: "⏸" },
+  "Suspensión jornada tarde":  { bg: "#fff7ed", borde: "#f97316", acento: "#9a3412", icono: "⏸" },
   "Suspensión parcial": { bg: "#f5f3ff", borde: "#8b5cf6", acento: "#5b21b6", icono: "⏸" },
 };
 
@@ -1854,123 +1855,295 @@ function toISODate(d) {
 function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, eliminando }) {
   const [lunes,   setLunes]   = useState(() => lunesDe(new Date()));
   const [hovered, setHovered] = useState(null);
+  const [modoDias, setModoDias] = useState("habiles"); // "habiles" (Lun-Vie) | "todos" (Lun-Dom)
 
   const hoyISO = toISODate(new Date());
 
-  const dias = Array.from({ length: 7 }, (_, i) => {
+  const diasTodos = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(lunes);
     d.setDate(d.getDate() + i);
     return d;
   });
 
+  // Si la semana actual contiene algún evento en sábado o domingo, incluir fin de semana automáticamente
+  const hayEventoFinde = eventos.some(ev => {
+    const f = ev.Evento_Institucional_Fecha?.slice(0, 10);
+    return f === toISODate(diasTodos[5]) || f === toISODate(diasTodos[6]);
+  });
+
+  const mostrarFinde = modoDias === "todos" || hayEventoFinde;
+  const diasAMostrar = mostrarFinde ? diasTodos : diasTodos.slice(0, 5);
+
   const prevSemana = () => { const d = new Date(lunes); d.setDate(d.getDate() - 7); setLunes(d); };
   const nextSemana = () => { const d = new Date(lunes); d.setDate(d.getDate() + 7); setLunes(d); };
   const irHoy      = () => setLunes(lunesDe(new Date()));
 
-  const domingo    = dias[6];
-  const rangoLabel = `${lunes.toLocaleDateString("es-CL", { day: "numeric", month: "short" })} – ${domingo.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}`;
+  const primerDia  = diasAMostrar[0];
+  const ultimoDia  = diasAMostrar[diasAMostrar.length - 1];
+  const primerISO  = toISODate(primerDia);
+  const ultimoISO  = toISODate(ultimoDia);
+
+  const rangoLabel = `${primerDia.toLocaleDateString("es-CL", { day: "numeric", month: "short" })} – ${ultimoDia.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}`;
+
+  const eventosEstaSemana = eventos.filter(ev => {
+    const f = ev.Evento_Institucional_Fecha?.slice(0, 10);
+    return f >= primerISO && f <= ultimoISO;
+  });
 
   const btnNav = {
     padding: "0.3rem 0.65rem", border: "1px solid #e5e7eb", borderRadius: 6,
     background: "#fff", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600, color: "#374151",
   };
 
+  const minGridWidth = diasAMostrar.length === 5 ? 650 : 840;
+
   return (
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 16px", borderBottom: "2px solid #e5e7eb", background: "#f8fafc", flexWrap: "wrap", gap: "0.5rem" }}>
+      {/* Barra superior de controles */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 16px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc", flexWrap: "wrap", gap: "0.6rem"
+      }}>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          <button onClick={prevSemana} style={btnNav}>‹</button>
-          <button onClick={nextSemana} style={btnNav}>›</button>
+          <button onClick={prevSemana} style={btnNav} title="Semana anterior">‹</button>
+          <button onClick={nextSemana} style={btnNav} title="Semana siguiente">›</button>
           <button onClick={irHoy} style={{ ...btnNav, fontSize: "0.78rem", color: "#1e40af", borderColor: "#93c5fd" }}>Hoy</button>
         </div>
-        <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e3a5f" }}>{rangoLabel}</span>
-        <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e3a5f" }}>{rangoLabel}</span>
+          <span style={{
+            fontSize: "0.74rem",
+            fontWeight: 600,
+            color: eventosEstaSemana.length > 0 ? "#1e40af" : "#64748b",
+            background: eventosEstaSemana.length > 0 ? "#dbeafe" : "#f1f5f9",
+            padding: "2px 8px",
+            borderRadius: 10,
+          }}>
+            {eventosEstaSemana.length === 0
+              ? "Sin eventos esta semana"
+              : `${eventosEstaSemana.length} evento${eventosEstaSemana.length !== 1 ? "s" : ""} esta semana`}
+          </span>
+        </div>
+
+        {/* Selector de modo días */}
+        <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff" }}>
+          <button
+            type="button"
+            onClick={() => setModoDias("habiles")}
+            style={{
+              padding: "0.3rem 0.65rem",
+              border: "none",
+              background: !mostrarFinde ? "#1e3a5f" : "#fff",
+              color: !mostrarFinde ? "#fff" : "#475569",
+              fontWeight: !mostrarFinde ? 700 : 500,
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Lun–Vie
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoDias("todos")}
+            style={{
+              padding: "0.3rem 0.65rem",
+              border: "none",
+              borderLeft: "1px solid #cbd5e1",
+              background: mostrarFinde ? "#1e3a5f" : "#fff",
+              color: mostrarFinde ? "#fff" : "#475569",
+              fontWeight: mostrarFinde ? 700 : 500,
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            7 días{hayEventoFinde ? " •" : ""}
+          </button>
+        </div>
       </div>
 
-      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
-        <div style={{ minWidth: 680 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-            {dias.map((dia, i) => {
-          const diaISO        = toISODate(dia);
-          const esHoy         = diaISO === hoyISO;
-          const esPasado      = diaISO < hoyISO;
-          const esFinde       = i >= 5;
-          const eventosDelDia = eventos.filter(ev => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaISO);
+      {/* Indicador de desplazamiento horizontal */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "4px 14px",
+        background: "#f1f5f9",
+        borderBottom: "1px solid #e2e8f0",
+        fontSize: "0.72rem",
+        color: "#64748b",
+      }}>
+        <span>⇄ Desliza horizontalmente para ver todos los días</span>
+        <span>{diasAMostrar.length} días ({mostrarFinde ? "Semana completa" : "Días hábiles"})</span>
+      </div>
 
-          return (
-            <div key={i} style={{
-              borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
-              borderTop: "1px solid #e5e7eb",
-              minHeight: 110,
-              background: esHoy ? "#eff6ff" : esFinde ? "#fafafa" : "#fff",
-              opacity: esPasado && !esHoy ? 0.72 : 1,
-            }}>
-              <div style={{ padding: "8px 6px 5px", borderBottom: "1px solid #f3f4f6", textAlign: "center" }}>
-                <div style={{ fontSize: "0.65rem", color: esFinde ? "#9ca3af" : "#6b7280",
-                  fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  {DIAS_ES[i]}
-                </div>
-                <div style={{
-                  fontSize: "1.05rem", fontWeight: 700, lineHeight: 1, marginTop: 3,
-                  color: esHoy ? "#fff" : esFinde ? "#9ca3af" : "#1e3a5f",
-                  background: esHoy ? "#1e40af" : "transparent",
-                  borderRadius: "50%", width: 28, height: 28,
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+      {/* Grid del calendario con scroll horizontal */}
+      <div
+        className="calendario-eventos-scroll"
+        style={{
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
+        }}
+      >
+        <div style={{ minWidth: minGridWidth }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${diasAMostrar.length}, minmax(0, 1fr))`,
+            width: "100%",
+          }}>
+            {diasAMostrar.map((dia, i) => {
+              const diaISO        = toISODate(dia);
+              const esHoy         = diaISO === hoyISO;
+              const esPasado      = diaISO < hoyISO;
+              const esFinde       = dia.getDay() === 0 || dia.getDay() === 6;
+              const diaSemanaIdx  = (dia.getDay() + 6) % 7; // 0=Lun, 6=Dom
+              const eventosDelDia = eventos.filter(ev => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaISO);
+
+              return (
+                <div key={diaISO} style={{
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
+                  borderTop: "1px solid #e5e7eb",
+                  minHeight: 125,
+                  background: esHoy ? "#eff6ff" : esFinde ? "#fbfbfe" : "#fff",
+                  opacity: esPasado && !esHoy ? 0.75 : 1,
+                  display: "flex",
+                  flexDirection: "column",
                 }}>
-                  {dia.getDate()}
-                </div>
-              </div>
-
-              <div style={{ padding: "4px 4px 6px", display: "flex", flexDirection: "column", gap: 3 }}>
-                {eventosDelDia.map(ev => {
-                  const col   = IMPACTO_COLORES[ev.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
-                  const isHov = hovered === ev.Evento_Institucional_Id;
-                  return (
-                    <div key={ev.Evento_Institucional_Id}
-                      onMouseEnter={() => setHovered(ev.Evento_Institucional_Id)}
-                      onMouseLeave={() => setHovered(null)}
-                      onClick={() => onVerDetalle(ev)}
-                      title="Ver detalle"
-                      style={{
-                        background: col.bg, border: `1px solid ${col.borde}`,
-                        borderLeft: `3px solid ${col.acento}`, borderRadius: 5,
-                        padding: "3px 5px", cursor: "pointer", fontSize: "0.7rem",
-                        lineHeight: 1.35, position: "relative",
-                        boxShadow: isHov ? "0 2px 8px rgba(0,0,0,0.1)" : "none",
-                        transition: "box-shadow 0.15s",
-                      }}>
-                      <div style={{ fontWeight: 700, color: col.acento,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        paddingRight: isHov ? 38 : 0 }}>
-                        {col.icono} {ev.Evento_Institucional_Nombre}
-                      </div>
-                      <div style={{ fontSize: "0.63rem", color: col.acento, opacity: 0.75, display: "flex", alignItems: "center", gap: 4 }}>
-                        <span>{ev.Evento_Institucional_Impacto_Clases}</span>
-                        {ev.bloques_afectados_count > 0 && (
-                          <span style={{ fontWeight: 700 }}>· {ev.bloques_afectados_count} bloq.</span>
-                        )}
-                      </div>
-                      {isHov && (
-                        <div style={{ position: "absolute", top: 3, right: 4, display: "flex", gap: 2 }}>
-                          <button title="Editar" onClick={e => { e.stopPropagation(); onEditar(ev); }}
-                            style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
-                              cursor: "pointer", background: col.acento, color: "#fff",
-                              fontSize: "0.55rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>
-                          <button title="Eliminar" disabled={eliminando === ev.Evento_Institucional_Id}
-                            onClick={e => { e.stopPropagation(); if (window.confirm("¿Eliminar este evento?")) onEliminar(ev.Evento_Institucional_Id); }}
-                            style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
-                              cursor: "pointer", background: "#dc2626", color: "#fff",
-                              fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-                        </div>
-                      )}
+                  {/* Encabezado del día */}
+                  <div style={{
+                    padding: "8px 6px 6px",
+                    borderBottom: "1px solid #f3f4f6",
+                    textAlign: "center",
+                    background: esHoy ? "rgba(30, 64, 175, 0.05)" : "transparent",
+                  }}>
+                    <div style={{
+                      fontSize: "0.68rem",
+                      color: esHoy ? "#1e40af" : esFinde ? "#9ca3af" : "#64748b",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}>
+                      {DIAS_ES[diaSemanaIdx]}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+                    <div style={{
+                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1, marginTop: 3,
+                      color: esHoy ? "#fff" : esFinde ? "#9ca3af" : "#1e3a5f",
+                      background: esHoy ? "#1e40af" : "transparent",
+                      borderRadius: "50%", width: 28, height: 28,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {dia.getDate()}
+                    </div>
+                  </div>
+
+                  {/* Lista de eventos del día */}
+                  <div style={{
+                    padding: "6px 5px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 5,
+                    flex: 1,
+                    minWidth: 0,
+                  }}>
+                    {eventosDelDia.length === 0 ? (
+                      <div style={{
+                        padding: "16px 2px",
+                        textAlign: "center",
+                        color: "#cbd5e1",
+                        fontSize: "0.68rem",
+                        fontStyle: "italic",
+                      }}>
+                        —
+                      </div>
+                    ) : (
+                      eventosDelDia.map(ev => {
+                        const col   = IMPACTO_COLORES[ev.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
+                        const isHov = hovered === ev.Evento_Institucional_Id;
+                        return (
+                          <div key={ev.Evento_Institucional_Id}
+                            onMouseEnter={() => setHovered(ev.Evento_Institucional_Id)}
+                            onMouseLeave={() => setHovered(null)}
+                            onClick={() => onVerDetalle(ev)}
+                            title={`Ver detalle: ${ev.Evento_Institucional_Nombre}`}
+                            style={{
+                              background: col.bg,
+                              border: `1px solid ${col.borde}`,
+                              borderLeft: `3px solid ${col.acento}`,
+                              borderRadius: 6,
+                              padding: "4px 6px",
+                              cursor: "pointer",
+                              minWidth: 0,
+                              position: "relative",
+                              boxShadow: isHov ? "0 3px 10px rgba(0,0,0,0.12)" : "0 1px 2px rgba(0,0,0,0.04)",
+                              transition: "all 0.15s ease",
+                            }}>
+                            <div style={{
+                              fontWeight: 700,
+                              color: col.acento,
+                              fontSize: "0.72rem",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              paddingRight: isHov ? 36 : 0,
+                            }} title={ev.Evento_Institucional_Nombre}>
+                              {col.icono} {ev.Evento_Institucional_Nombre}
+                            </div>
+                            <div style={{
+                              fontSize: "0.62rem",
+                              color: col.acento,
+                              opacity: 0.9,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                              flexWrap: "wrap",
+                              marginTop: 2,
+                            }}>
+                              <span style={{
+                                background: "rgba(255,255,255,0.75)",
+                                padding: "1px 4px",
+                                borderRadius: 3,
+                                whiteSpace: "nowrap",
+                              }}>
+                                {ev.Evento_Institucional_Impacto_Clases}
+                              </span>
+                              {ev.bloques_afectados_count > 0 && (
+                                <span style={{
+                                  fontWeight: 700,
+                                  background: "rgba(255,255,255,0.75)",
+                                  padding: "1px 4px",
+                                  borderRadius: 3,
+                                  whiteSpace: "nowrap",
+                                }}>
+                                  · {ev.bloques_afectados_count} bloq.
+                                </span>
+                              )}
+                            </div>
+                            {isHov && (
+                              <div style={{ position: "absolute", top: 3, right: 3, display: "flex", gap: 2 }}>
+                                <button title="Editar" onClick={e => { e.stopPropagation(); onEditar(ev); }}
+                                  style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
+                                    cursor: "pointer", background: col.acento, color: "#fff",
+                                    fontSize: "0.55rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>
+                                <button title="Eliminar" disabled={eliminando === ev.Evento_Institucional_Id}
+                                  onClick={e => { e.stopPropagation(); if (window.confirm("¿Eliminar este evento?")) onEliminar(ev.Evento_Institucional_Id); }}
+                                  style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
+                                    cursor: "pointer", background: "#dc2626", color: "#fff",
+                                    fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
