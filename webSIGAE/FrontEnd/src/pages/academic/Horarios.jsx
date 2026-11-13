@@ -356,8 +356,9 @@ export default function Horarios() {
   const [guardando, setGuardando] = useState(false);
   const [errorPanel, setErrorPanel] = useState("");
 
-  // Bulk suspend
+  // Bulk suspend / reactivate
   const [suspendiendo, setSuspendiendo] = useState(false);
+  const [confirmarAccionMasiva, setConfirmarAccionMasiva] = useState(null);
 
   // Selección múltiple de bloques (CU63 / CU64)
   const [modoSeleccion, setModoSeleccion] = useState(false);
@@ -630,28 +631,60 @@ export default function Horarios() {
     }
   };
 
-  const handleSuspenderTodo = async () => {
-    if (!window.confirm(`¿Suspender ${bloquesActivos} bloque(s) activo(s)?`)) return;
+  const handleSuspenderTodo = () => {
+    if (bloquesActivos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "suspender", cantidad: bloquesActivos });
+  };
+
+  const handleReactivarTodo = () => {
+    if (bloquesSuspendidos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "reactivar", cantidad: bloquesSuspendidos });
+  };
+
+  const ejecutarAccionMasiva = async () => {
+    if (!confirmarAccionMasiva || suspendiendo) return;
+    const { tipo } = confirmarAccionMasiva;
     setSuspendiendo(true);
+    setError("");
     try {
-      const activos = horarios.filter((h) => h.estado === "Activo");
+      const targetEstado = tipo === "suspender" ? "Suspendido" : "Activo";
+      const sourceEstado = tipo === "suspender" ? "Activo" : "Suspendido";
+      const lista = horarios.filter((h) => h.estado === sourceEstado && !esEliminada(h));
+
+      if (lista.length === 0) {
+        setConfirmarAccionMasiva(null);
+        return;
+      }
+
       const resultados = await Promise.allSettled(
-        activos.map((h) =>
-          fetch(`${API}/horarios/${h.Horario_Asignatura_Id}/estado`, {
+        lista.map((h) =>
+          fetch(apiUrl(`/horarios/${h.Horario_Asignatura_Id}/estado`), {
             method: "PATCH",
             headers: authHeaders(),
-            body: JSON.stringify({ estado: "Suspendido" }),
+            body: JSON.stringify({ estado: targetEstado }),
           })
         )
       );
-      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value.ok).length;
+
+      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value?.ok).length;
       if (fallidos > 0) {
-        setError(`No se pudieron suspender ${fallidos} de ${activos.length} bloque(s). Revisa el horario e intenta nuevamente.`);
+        setError(
+          `No se pudieron ${tipo === "suspender" ? "suspender" : "reactivar"} ${fallidos} de ${lista.length} bloque(s). Revisa el horario e intenta nuevamente.`
+        );
+      } else {
+        setExito(
+          tipo === "suspender"
+            ? `Se suspendieron correctamente los ${lista.length} bloque(s) de clases del curso.`
+            : `Se reactivaron correctamente los ${lista.length} bloque(s) de clases del curso.`
+        );
+        setTimeout(() => setExito(""), 4000);
       }
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+
+      await cargarHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
+      setConfirmarAccionMasiva(null);
     } catch {
-      setError("Error al suspender clases.");
+      setError(`Error al ${tipo === "suspender" ? "suspender" : "reactivar"} las clases.`);
     } finally {
       setSuspendiendo(false);
     }
@@ -693,6 +726,7 @@ export default function Horarios() {
     return acc;
   }, {})).sort((a, b) => (!a.id) - (!b.id) || a.nombre.localeCompare(b.nombre, "es"));
   const bloquesActivos = horarios.filter((h) => h.estado === "Activo").length;
+  const bloquesSuspendidos = horarios.filter((h) => h.estado === "Suspendido" && !esEliminada(h)).length;
 
   const preview =
     panelAbierto && !modoEdicion && form.Bloque_Horario_Id && form.Horario_Asignatura_Dia_Semana
@@ -935,16 +969,33 @@ export default function Horarios() {
                 </div>
               )}
 
-              {/* Bulk suspend */}
-              {bloquesActivos > 0 && (
-                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb" }}>
-                  <button
-                    style={s.btnSuspenderTodo}
-                    onClick={handleSuspenderTodo}
-                    disabled={suspendiendo}
-                  >
-                    {suspendiendo ? "Suspendiendo..." : "⚠ Suspender todas las clases"}
-                  </button>
+              {/* Bulk suspend / reactivate */}
+              {(bloquesActivos > 0 || bloquesSuspendidos > 0) && (
+                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bloquesActivos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnSuspenderTodo}
+                      onClick={handleSuspenderTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "suspender"
+                        ? "Suspendiendo..."
+                        : `⚠ Suspender todas las clases (${bloquesActivos})`}
+                    </button>
+                  )}
+                  {bloquesSuspendidos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnReactivarTodo}
+                      onClick={handleReactivarTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "reactivar"
+                        ? "Reactivando..."
+                        : `⟳ Reactivar clases suspendidas (${bloquesSuspendidos})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1091,6 +1142,98 @@ export default function Horarios() {
       {/* CU69 — Visualizando detalle de bloque horario */}
       {detalleBloqueId && (
         <DetalleBloqueModal horarioId={detalleBloqueId} onClose={() => setDetalleBloqueId(null)} />
+      )}
+
+      {/* Modal de confirmación para suspender/reactivar todas las clases */}
+      {confirmarAccionMasiva && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "1rem",
+          }}
+          onClick={() => !suspendiendo && setConfirmarAccionMasiva(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              maxWidth: "440px",
+              width: "100%",
+              padding: "1.5rem",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <span style={{ fontSize: "1.5rem" }}>
+                {confirmarAccionMasiva.tipo === "suspender" ? "⚠️" : "🔄"}
+              </span>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#1e293b" }}>
+                {confirmarAccionMasiva.tipo === "suspender"
+                  ? "¿Suspender todas las clases?"
+                  : "¿Reactivar todas las clases?"}
+              </h3>
+            </div>
+            <p style={{ margin: "0 0 1.25rem", color: "#4b5563", fontSize: "0.88rem", lineHeight: 1.5 }}>
+              {confirmarAccionMasiva.tipo === "suspender"
+                ? `¿Confirmas que deseas suspender los ${confirmarAccionMasiva.cantidad} bloque(s) activo(s) del curso ${cursoObj?.Curso_Nombre || ""}? Las clases continuarán en el horario pero figurarán marcadas como suspendidas.`
+                : `¿Confirmas que deseas reactivar los ${confirmarAccionMasiva.cantidad} bloque(s) suspendido(s) del curso ${cursoObj?.Curso_Nombre || ""}?`}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setConfirmarAccionMasiva(null)}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "1px solid #d1d5db",
+                  background: "#ffffff",
+                  color: "#374151",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarAccionMasiva}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: confirmarAccionMasiva.tipo === "suspender" ? "#d97706" : "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "wait" : "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                {suspendiendo && (
+                  <span style={{ display: "inline-block", animation: "spin 0.8s linear infinite" }}>↺</span>
+                )}
+                {suspendiendo
+                  ? (confirmarAccionMasiva.tipo === "suspender" ? "Suspendiendo..." : "Reactivando...")
+                  : (confirmarAccionMasiva.tipo === "suspender" ? "Sí, suspender clases" : "Sí, reactivar clases")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Clases pendientes de reubicar tras redefinir la jornada o los bloques */}
@@ -2880,6 +3023,18 @@ const s = {
     background: "#fef3c7",
     border: "1px solid #fcd34d",
     color: "#92400e",
+    padding: "0.4rem 0.75rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.78rem",
+    textAlign: "center",
+  },
+  btnReactivarTodo: {
+    width: "100%",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    color: "#1d4ed8",
     padding: "0.4rem 0.75rem",
     borderRadius: "6px",
     cursor: "pointer",
