@@ -78,9 +78,19 @@ function HistorialCitaciones() {
     mensaje: "",
     error: "",
   });
-  const [filtroState, setFiltroState] = useState({ id: "", valor: "todas" });
+  const [prevEstudianteId, setPrevEstudianteId] = useState(estudianteId);
+  const [filtroEstado, setFiltroEstado] = useState("todas");
+  const [busquedaCitacion, setBusquedaCitacion] = useState("");
   const [ascendente, setAscendente] = useState(false);
   const [seleccionState, setSeleccionState] = useState(null);
+
+  // Reinicia los filtros y la selección al cambiar de estudiante
+  if (prevEstudianteId !== estudianteId) {
+    setPrevEstudianteId(estudianteId);
+    setFiltroEstado("todas");
+    setBusquedaCitacion("");
+    setSeleccionState(null);
+  }
 
   // CU79 paso 3: estudiantes que el actor puede consultar según su rol
   useEffect(() => {
@@ -129,7 +139,7 @@ function HistorialCitaciones() {
   const inconsistentes = datosActuales?.inconsistentes || 0;
   const mensajeVacio = datosActuales?.mensaje || "";
   const errorCarga = datosActuales?.error || "";
-  const filtroEstado = filtroState.id === estudianteId ? filtroState.valor : "todas";
+  const filtroActivo = filtroEstado;
   const seleccionada = seleccionState?.estudianteId === estudianteId ? seleccionState.citacion : null;
 
   const reintentar = () => {
@@ -138,10 +148,15 @@ function HistorialCitaciones() {
   };
 
   const seleccionarEstudiante = (id) => {
-    setFiltroState({ id, valor: "todas" });
+    setFiltroEstado("todas");
+    setBusquedaCitacion("");
     setSeleccionState(null);
     if (id) setSearchParams({ estudiante: id });
     else setSearchParams({});
+  };
+
+  const alternarFiltroEstado = (clave) => {
+    setFiltroEstado((prev) => (prev === clave ? "todas" : clave));
   };
 
   const criterio = normalizarTexto(busqueda);
@@ -158,7 +173,29 @@ function HistorialCitaciones() {
   const cursoEstudianteActivo = estudianteActual?.Curso_Nombre || citaciones[0]?.Curso_Nombre || "";
 
   const visibles = ordenarCronologicamente(
-    filtroEstado === "todas" ? citaciones : citaciones.filter((c) => categoriaCitacion(c) === filtroEstado),
+    citaciones.filter((c) => {
+      if (filtroActivo !== "todas" && categoriaCitacion(c) !== filtroActivo) {
+        return false;
+      }
+      if (busquedaCitacion.trim()) {
+        const q = normalizarTexto(busquedaCitacion);
+        const docente = normalizarTexto(c.Docente_Nombre || "");
+        const motivo = normalizarTexto(c.Citacion_Motivo || "");
+        const modalidad = normalizarTexto(c.Citacion_Modalidad || "");
+        const tramo = normalizarTexto(tramoCitacion(c) || "");
+        const fecha = normalizarTexto(formatearFecha(c.Citacion_Fecha) || "");
+        const estado = normalizarTexto(c.Citacion_Estado || "");
+        const match =
+          docente.includes(q) ||
+          motivo.includes(q) ||
+          modalidad.includes(q) ||
+          tramo.includes(q) ||
+          fecha.includes(q) ||
+          estado.includes(q);
+        if (!match) return false;
+      }
+      return true;
+    }),
     ascendente
   );
 
@@ -183,13 +220,30 @@ function HistorialCitaciones() {
       {/* Paso 3: selecciona o identifica al estudiante a consultar */}
       <div className="usuarios-filtros">
         <input
-          type="text"
+          type="search"
           className="usuarios-search"
           placeholder="Filtrar estudiantes por nombre o RUT..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && estudiantesFiltrados.length > 0) {
+              e.preventDefault();
+              seleccionarEstudiante(estudiantesFiltrados[0].Estudiante_Id);
+            }
+          }}
           disabled={cargandoEstudiantes || estudiantes.length === 0}
+          aria-label="Filtrar estudiantes por nombre o RUT"
         />
+        {busqueda && (
+          <button
+            type="button"
+            className="btn-secondary cit-btn-limpiar"
+            onClick={() => setBusqueda("")}
+            title="Limpiar búsqueda de estudiante"
+          >
+            Limpiar
+          </button>
+        )}
         <select
           className="usuarios-select cit-select-estudiante"
           value={estudianteId}
@@ -261,24 +315,48 @@ function HistorialCitaciones() {
                 </div>
               )}
 
-              <div className="cit-resumen">
-                <div className="cit-stat">
+              <div className="cit-resumen" role="group" aria-label="Filtro por estado de citación">
+                <button
+                  type="button"
+                  className={`cit-stat ${filtroActivo === "todas" ? "cit-stat-activo" : ""}`}
+                  onClick={() => setFiltroEstado("todas")}
+                  aria-pressed={filtroActivo === "todas"}
+                  title="Mostrar todas las citaciones"
+                >
                   <span className="cit-stat-valor">{citaciones.length}</span>
                   <span className="cit-stat-label">Total</span>
-                </div>
-                {resumen.map((r) => (
-                  <div key={r.clave} className={`cit-stat cit-stat-${r.clave}`}>
-                    <span className="cit-stat-valor">{r.total}</span>
-                    <span className="cit-stat-label">{r.etiqueta}</span>
-                  </div>
-                ))}
+                </button>
+                {resumen.map((r) => {
+                  const activa = filtroActivo === r.clave;
+                  return (
+                    <button
+                      key={r.clave}
+                      type="button"
+                      className={`cit-stat cit-stat-${r.clave} ${activa ? "cit-stat-activo" : ""}`}
+                      onClick={() => alternarFiltroEstado(r.clave)}
+                      aria-pressed={activa}
+                      title={`Filtrar por ${r.etiqueta} (${r.total})`}
+                    >
+                      <span className="cit-stat-valor">{r.total}</span>
+                      <span className="cit-stat-label">{r.etiqueta}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="cit-toolbar">
+                <input
+                  type="search"
+                  className="usuarios-search cit-search-toolbar"
+                  placeholder="Buscar en historial por motivo, docente o modalidad..."
+                  value={busquedaCitacion}
+                  onChange={(e) => setBusquedaCitacion(e.target.value)}
+                  aria-label="Buscar en historial de citaciones"
+                />
                 <select
                   className="usuarios-select cit-select-auto"
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroState({ id: estudianteId, valor: e.target.value })}
+                  value={filtroActivo}
+                  onChange={(e) => setFiltroEstado(e.target.value)}
                   aria-label="Filtrar por estado"
                 >
                   {CATEGORIAS_AGENDA.map(({ clave, etiqueta }) => (
@@ -288,12 +366,28 @@ function HistorialCitaciones() {
                 <button type="button" className="btn-vista" onClick={() => setAscendente((a) => !a)}>
                   {ascendente ? "Más antiguas primero ↑" : "Más recientes primero ↓"}
                 </button>
+                {(filtroActivo !== "todas" || busquedaCitacion) && (
+                  <button
+                    type="button"
+                    className="btn-secondary cit-btn-limpiar"
+                    onClick={() => {
+                      setFiltroEstado("todas");
+                      setBusquedaCitacion("");
+                    }}
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
               </div>
 
               {visibles.length === 0 ? (
-                <div className="usuarios-empty">No hay citaciones con el estado seleccionado.</div>
+                <div className="usuarios-empty">
+                  {busquedaCitacion
+                    ? `No hay citaciones que coincidan con "${busquedaCitacion}".`
+                    : "No hay citaciones con el estado seleccionado."}
+                </div>
               ) : (
-                <div className="cit-tabla-wrap">
+                <div className="cit-tabla-wrap cit-tabla-wrap--historial">
                   <table className="tabla-usuarios cit-tabla-historial">
                     <thead>
                       <tr>

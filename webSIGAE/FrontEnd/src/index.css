@@ -2458,6 +2458,7 @@ body.bloques-panel-open .main-content {
   margin-bottom: 16px;
 }
 
+button.cit-stat,
 .cit-stat {
   display: flex;
   flex-direction: column;
@@ -2468,6 +2469,52 @@ body.bloques-panel-open .main-content {
   border: 1px solid #e2e8f0;
   border-top: 3px solid #4f46e5;
   border-radius: 10px;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+button.cit-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+button.cit-stat:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+button.cit-stat.cit-stat-activo {
+  background: #f8fafc;
+  box-shadow: 0 0 0 2px #4f46e5;
+  border-color: #4f46e5;
+}
+
+button.cit-stat-pendiente.cit-stat-activo {
+  background: #fefce8;
+  box-shadow: 0 0 0 2px #f59e0b;
+  border-color: #f59e0b;
+}
+
+button.cit-stat-futura.cit-stat-activo {
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px #2563eb;
+  border-color: #2563eb;
+}
+
+button.cit-stat-confirmada.cit-stat-activo {
+  background: #f0fdf4;
+  box-shadow: 0 0 0 2px #16a34a;
+  border-color: #16a34a;
+}
+
+button.cit-stat-cancelada.cit-stat-activo {
+  background: #fef2f2;
+  box-shadow: 0 0 0 2px #dc2626;
+  border-color: #dc2626;
 }
 
 .cit-stat-pendiente  { border-top-color: #f59e0b; }
@@ -2491,6 +2538,15 @@ body.bloques-panel-open .main-content {
 
 .cit-select-auto {
   width: auto;
+}
+
+.cit-search-toolbar {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.cit-btn-limpiar {
+  white-space: nowrap;
 }
 
 .cit-tabla-wrap {
@@ -3848,6 +3904,7 @@ body {
     text-align: center;
   }
 
+  .cit-tabla-wrap--historial,
   .cit-tabla-wrap:has(.cit-tabla-historial) {
     background: transparent;
     box-shadow: none;
