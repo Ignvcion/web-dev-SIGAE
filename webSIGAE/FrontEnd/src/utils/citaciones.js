@@ -184,15 +184,9 @@ export function descripcionEstadoDetalle(c) {
     if (yaPasoCitacion(c)) return "Sin confirmar · Horario vencido";
     if (c.Requiere_Confirmacion_De === "Docente") return "Esperando confirmación del docente";
     if (c.Requiere_Confirmacion_De === "Apoderado") return "Esperando confirmación del apoderado";
-    const raw = String(c.Citacion_Estado || "").trim();
-    if (!raw || raw.toLowerCase() === "pendiente") return "Pendiente de confirmación";
-    return raw;
+    return "";
   }
-  if (cat === "futura") return "Confirmada";
-  const raw = String(c.Citacion_Estado || "").trim();
-  const etiqueta = ETIQUETAS_CATEGORIA[cat];
-  if (!raw || raw.toLowerCase() === String(etiqueta || "").toLowerCase()) return "";
-  return raw;
+  return "";
 }
 
 // CU74 - Excepción 1: datos incompletos o inválidos en el formulario de citación
