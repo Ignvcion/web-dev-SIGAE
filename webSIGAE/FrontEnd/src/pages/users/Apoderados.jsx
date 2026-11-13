@@ -283,6 +283,7 @@ function Apoderados() {
 
   const limpiarFiltroCantidad = () => {
     cancelarFiltro();
+    setBusqueda("");
     setOperadorFiltro("=");
     setCantidadFiltro("");
     cargarApoderados({});
@@ -315,12 +316,21 @@ function Apoderados() {
       {/* Buscador */}
       <div className="usuarios-filtros usuarios-filtros--en-linea">
         <input
-          type="text"
+          type="search"
           className="usuarios-search"
           placeholder="Buscar por nombre o RUT..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+        {busqueda && (
+          <button
+            type="button"
+            className="btn-roles"
+            onClick={() => setBusqueda("")}
+          >
+            Limpiar búsqueda
+          </button>
+        )}
       </div>
 
       {/* CU33: filtro por cantidad de estudiantes asociados */}
@@ -384,7 +394,7 @@ function Apoderados() {
           </thead>
           <tbody>
             {apoderadosFiltrados.map((u, idx) => (
-              <tr key={u.Usuario_Id}>
+              <tr key={`${u.Usuario_Id || "apo"}-${u.Usuario_RUT || idx}-${idx}`}>
                 <td>{idx + 1}</td>
                 <td>{u.Usuario_Nombre_Completo}</td>
                 <td>{u.Usuario_RUT}</td>
