@@ -1931,6 +1931,11 @@ select {
   to   { transform: translateX(0); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .sidebar {
   transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease;
 }

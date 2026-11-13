@@ -133,6 +133,7 @@ function ClasesEliminadasMini({ clases }) {
 function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
   const { tonosAsignatura } = useColores();
   const [vistas, setVistas] = useState({});
+  const [refrescando, setRefrescando] = useState(false);
 
   useEffect(() => {
     document.body.classList.add("horarios-listado-open");
@@ -152,11 +153,42 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
       ]);
       const colorMap = {};
       (Array.isArray(rA) ? rA : []).forEach((a, i) => {
-        colorMap[a.Asignatura_Id] = tonosAsignatura(a.Asignatura_Id) || ASIG_COLORS[i % ASIG_COLORS.length];
+        colorMap[a.Asignatura_Id] = (tonosAsignatura && tonosAsignatura(a.Asignatura_Id)) || ASIG_COLORS[i % ASIG_COLORS.length];
       });
       setVistas(p => ({ ...p, [cursoId]: { horarios: Array.isArray(rH) ? rH : [], colorMap } }));
     } catch {
       setVistas(p => ({ ...p, [cursoId]: null }));
+    }
+  };
+
+  const handleRefrescar = async () => {
+    if (refrescando) return;
+    setRefrescando(true);
+    try {
+      await onRefresh?.();
+      const cursosAbiertos = Object.keys(vistas).filter(id => vistas[id] && vistas[id] !== "loading");
+      if (cursosAbiertos.length > 0) {
+        const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+        const nuevasVistas = { ...vistas };
+        await Promise.all(cursosAbiertos.map(async (cId) => {
+          try {
+            const [rH, rA] = await Promise.all([
+              fetch(apiUrl(`/horarios?curso_id=${cId}&incluir_eliminadas=1`), { headers: h }).then(r => r.json()),
+              fetch(apiUrl(`/horarios/asignaturas-curso?curso_id=${cId}`), { headers: h }).then(r => r.json()),
+            ]);
+            const colorMap = {};
+            (Array.isArray(rA) ? rA : []).forEach((a, i) => {
+              colorMap[a.Asignatura_Id] = (tonosAsignatura && tonosAsignatura(a.Asignatura_Id)) || ASIG_COLORS[i % ASIG_COLORS.length];
+            });
+            nuevasVistas[cId] = { horarios: Array.isArray(rH) ? rH : [], colorMap };
+          } catch {
+            // mantener estado si falla petición individual
+          }
+        }));
+        setVistas(nuevasVistas);
+      }
+    } finally {
+      setRefrescando(false);
     }
   };
 
@@ -180,8 +212,58 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
             <div style={{ color: "#94a3b8", fontSize: "0.68rem", marginTop: 1 }}>{cursos.length} cursos — comparación de horarios</div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onRefresh} title="Actualizar" aria-label="Actualizar listado" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#94a3b8", borderRadius: 6, width: 32, height: 32, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center" }}>↺</button>
-            <button onClick={onClose} title="Cerrar listado" aria-label="Cerrar listado" style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 6, width: 32, height: 32, cursor: "pointer", fontSize: "0.9rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button
+              type="button"
+              onClick={handleRefrescar}
+              disabled={refrescando}
+              title={refrescando ? "Actualizando listado..." : "Actualizar listado"}
+              aria-label="Actualizar listado"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.22)",
+                color: refrescando ? "#60a5fa" : "#cbd5e1",
+                borderRadius: 6,
+                width: 32,
+                height: 32,
+                cursor: refrescando ? "wait" : "pointer",
+                fontSize: "0.95rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.15s ease",
+                opacity: refrescando ? 0.7 : 1,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  animation: refrescando ? "spin 0.8s linear infinite" : "none",
+                }}
+              >
+                ↺
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              title="Cerrar listado"
+              aria-label="Cerrar listado"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff",
+                borderRadius: 6,
+                width: 32,
+                height: 32,
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
 
@@ -353,20 +435,25 @@ export default function Horarios() {
     }
   }, []);
 
-  const cargarResumenCursos = useCallback(() =>
-    fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() })
-      .then(async (res) => {
-        const data = await res.json();
-        setResumenCursos(res.ok && Array.isArray(data) ? data : []);
-      })
-      .catch(() => setResumenCursos([])), []);
+  const cargarResumenCursos = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() });
+      const data = await res.json();
+      const lista = res.ok && Array.isArray(data) ? data : [];
+      setResumenCursos(lista);
+      return lista;
+    } catch {
+      setResumenCursos([]);
+      return [];
+    }
+  }, []);
 
   useEffect(() => {
     if (esDocente) pedirHorarios("");
   }, [esDocente, pedirHorarios]);
 
   useEffect(() => {
-    if (listadoAbierto) cargarResumenCursos();
+    if (listadoAbierto) Promise.resolve().then(() => cargarResumenCursos());
   }, [listadoAbierto, cargarResumenCursos]);
 
   useEffect(() => {
