@@ -13,6 +13,7 @@ import {
   descripcionEstadoDetalle,
   esCancelada,
   esEditable,
+  esPendiente,
   esTramoPasadoHoy,
   fechaISO,
   formatearFecha,
@@ -191,6 +192,35 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
 
         {!cargando && citacion && vista === "detalle" && (
           <>
+            {puedeConfirmar(citacion, rol) && esEditable(citacion) && (
+              <div className="cit-banner-confirmar">
+                <div className="cit-banner-confirmar-info">
+                  <strong>Solicitud pendiente de tu confirmación</strong>
+                  <p>Confirma tu asistencia para fijar la reunión en la agenda escolar.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-reactivar btn-confirmar-destacado"
+                  onClick={handleConfirmar}
+                  disabled={procesando}
+                >
+                  {procesando ? "Confirmando..." : "✓ Confirmar citación"}
+                </button>
+              </div>
+            )}
+
+            {esPendiente(citacion) && !puedeConfirmar(citacion, rol) && esEditable(citacion) && (
+              <div className="cit-aviso-contraparte">
+                <strong>⏳ Esperando confirmación de la contraparte</strong>
+                <p>
+                  Esta citación requiere la confirmación del{" "}
+                  {citacion.Requiere_Confirmacion_De === "Docente" ? "docente" : "apoderado"}{" "}
+                  (<strong>{citacion.Requiere_Confirmacion_De === "Docente" ? citacion.Docente_Nombre || "Docente asignado" : citacion.Apoderado_Nombre || "Apoderado"}</strong>).
+                  Por seguridad institucional (CU75), la asistencia debe ser confirmada directamente por la persona citada desde su cuenta de usuario.
+                </p>
+              </div>
+            )}
+
             <dl className="cit-detalle">
               <dt>Estado</dt>
               <dd>

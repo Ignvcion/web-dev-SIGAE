@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
+import { confirmarCitacion, getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
 import {
   CATEGORIAS_AGENDA,
   categoriaCitacion,
@@ -73,6 +73,7 @@ function Citaciones() {
   const [estudiantes, setEstudiantes] = useState([]);
   const [msgSinEstudiantes, setMsgSinEstudiantes] = useState("");
   const [detalleId, setDetalleId] = useState(null);
+  const [confirmandoId, setConfirmandoId] = useState(null);
 
   // CU78 pasos 1–4 (agenda) y CU75 getCitacionesPendientes(): se consultan juntas y el estado
   // se actualiza solo al recibir la respuesta
@@ -137,6 +138,23 @@ function Citaciones() {
     setDetalleId(null);
     setMsgExito(mensaje);
     recargar();
+  };
+
+  // CU75: confirmación directa de citación pendiente desde la tarjeta de aviso
+  const handleConfirmarDirecto = async (c) => {
+    setConfirmandoId(c.Citacion_Id);
+    setErrorCarga("");
+    try {
+      const data = await confirmarCitacion(c.Citacion_Id);
+      setMsgExito(
+        data?.mensaje || "Citación confirmada correctamente. Se notificó el cambio de estado a la contraparte."
+      );
+      recargar();
+    } catch (err) {
+      setErrorCarga(err.message || "No fue posible confirmar la citación. Intente nuevamente.");
+    } finally {
+      setConfirmandoId(null);
+    }
   };
 
   const conteo = CATEGORIAS_AGENDA.reduce((acc, { clave }) => {
@@ -238,9 +256,23 @@ function Citaciones() {
                     {` · ${c.Citacion_Modalidad}`}
                   </div>
                 </div>
-                <button type="button" className="btn-reactivar" onClick={() => setDetalleId(c.Citacion_Id)}>
-                  Revisar y confirmar
-                </button>
+                <div className="cit-pendiente-acciones">
+                  <button
+                    type="button"
+                    className="btn-reactivar"
+                    onClick={() => handleConfirmarDirecto(c)}
+                    disabled={confirmandoId === c.Citacion_Id}
+                  >
+                    {confirmandoId === c.Citacion_Id ? "Confirmando..." : "Confirmar asistencia"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setDetalleId(c.Citacion_Id)}
+                  >
+                    Ver detalle
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
