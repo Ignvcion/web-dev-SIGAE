@@ -35,6 +35,26 @@ function BadgeTramo({ valor }) {
   );
 }
 
+const deduplicarAsignaturas = (lista) => {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
+  let maxId = 1000;
+  for (const a of lista) {
+    const idNum = Number(a?.Asignatura_Id);
+    if (!isNaN(idNum) && idNum > maxId) maxId = idNum;
+  }
+  return lista.map((a) => {
+    const idNum = Number(a?.Asignatura_Id);
+    if (!idNum || isNaN(idNum) || vistos.has(idNum)) {
+      maxId += 1;
+      vistos.add(maxId);
+      return { ...a, Asignatura_Id: maxId };
+    }
+    vistos.add(idNum);
+    return { ...a, Asignatura_Id: idNum };
+  });
+};
+
 function FormAsignatura({ inicial, onGuardar, onCancelar, guardando, error, usados }) {
   const [nombre, setNombre]       = useState(inicial?.nombre    || "");
   const [tramo, setTramo]         = useState(inicial?.tramo || "");
@@ -142,7 +162,7 @@ function Asignaturas() {
     fetch(apiUrl("/planes/asignaturas"), { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         const data = await res.json();
-        if (res.ok) setAsignaturas(data);
+        if (res.ok) setAsignaturas(deduplicarAsignaturas(data));
         else setError(data.error || "Error al cargar asignaturas");
       })
       .catch(() => setError("Error al conectar con el servidor"))
@@ -353,7 +373,7 @@ function Asignaturas() {
           </thead>
           <tbody>
             {filtradas.map((a, i) => (
-              <tr key={a.Asignatura_Id} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
+              <tr key={`asig-${a.Asignatura_Id}-${i}`} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
                 <td style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{i + 1}</td>
                 <td>
                   {esAdmin ? (
