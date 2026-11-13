@@ -587,16 +587,32 @@ export default function Horarios() {
 
   const handleCambiarEstado = async (id, estadoActual) => {
     const nuevoEstado = estadoActual === "Activo" ? "Suspendido" : "Activo";
+    // Actualización optimista inmediata
+    setHorarios((prev) =>
+      prev.map((h) =>
+        h.Horario_Asignatura_Id === id
+          ? { ...h, estado: nuevoEstado, Horario_Asignatura_Estado: nuevoEstado }
+          : h
+      )
+    );
     try {
-      const res = await fetch(`${API}/horarios/${id}/estado`, {
+      const res = await fetch(apiUrl(`/horarios/${id}/estado`), {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+      await pedirHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
     } catch (e) {
+      // Revertir en caso de error
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.Horario_Asignatura_Id === id
+            ? { ...h, estado: estadoActual, Horario_Asignatura_Estado: estadoActual }
+            : h
+        )
+      );
       setError(e.message || "Error al cambiar estado");
     }
   };
@@ -631,12 +647,14 @@ export default function Horarios() {
     }
   };
 
-  const handleSuspenderTodo = () => {
+  const handleSuspenderTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
     if (bloquesActivos <= 0) return;
     setConfirmarAccionMasiva({ tipo: "suspender", cantidad: bloquesActivos });
   };
 
-  const handleReactivarTodo = () => {
+  const handleReactivarTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
     if (bloquesSuspendidos <= 0) return;
     setConfirmarAccionMasiva({ tipo: "reactivar", cantidad: bloquesSuspendidos });
   };
@@ -655,6 +673,15 @@ export default function Horarios() {
         setConfirmarAccionMasiva(null);
         return;
       }
+
+      // Actualización optimista inmediata en la interfaz: evita parpadeos y sensación de reinicio
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.estado === sourceEstado && !esEliminada(h)
+            ? { ...h, estado: targetEstado, Horario_Asignatura_Estado: targetEstado }
+            : h
+        )
+      );
 
       const resultados = await Promise.allSettled(
         lista.map((h) =>
@@ -680,10 +707,12 @@ export default function Horarios() {
         setTimeout(() => setExito(""), 4000);
       }
 
-      await cargarHorarios(cursoSeleccionado);
+      // Sincronización silenciosa en segundo plano sin desmontar la pantalla (evita setLoading(true))
+      await pedirHorarios(cursoSeleccionado);
       await cargarAsignaturas(cursoSeleccionado);
       setConfirmarAccionMasiva(null);
     } catch {
+      await pedirHorarios(cursoSeleccionado);
       setError(`Error al ${tipo === "suspender" ? "suspender" : "reactivar"} las clases.`);
     } finally {
       setSuspendiendo(false);
@@ -1208,7 +1237,10 @@ export default function Horarios() {
               </button>
               <button
                 type="button"
-                onClick={ejecutarAccionMasiva}
+                onClick={(e) => {
+                  e.preventDefault();
+                  ejecutarAccionMasiva();
+                }}
                 disabled={suspendiendo}
                 style={{
                   padding: "0.5rem 1rem",
