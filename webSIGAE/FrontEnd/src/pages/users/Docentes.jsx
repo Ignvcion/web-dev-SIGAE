@@ -253,7 +253,7 @@ function Docentes() {
                   const etiquetas = separarEtiquetas(d.Docente_Especialidad);
                   const editando = edicion?.id === d.Usuario_Id;
                   return (
-                    <tr key={d.Usuario_Id}>
+                    <tr key={`${d.Usuario_Id || "doc"}-${d.Usuario_RUT || idx}-${idx}`}>
                       <td>{idx + 1}</td>
                       <td>
                         <SelectorColor

@@ -59,12 +59,27 @@ function BuscarUsuarios() {
     try {
       const data = await buscarUsuarioExistente(datos);
       if (!vigente()) return;
-      if (Array.isArray(data)) {
-        setUsuarios(data);
-      } else {
-        // CU28 - Excepción "Sin coincidencias"
-        setUsuarios(data.usuarios || []);
-        setMensajeInfo(data.mensaje || "No se encontraron usuarios");
+      let lista = Array.isArray(data) ? data : (data?.usuarios || []);
+      const qNom = (filtros.nombre || "").trim().toLowerCase();
+      const qRut = (filtros.rut || "").trim().toLowerCase();
+      const qCor = (filtros.correo || "").trim().toLowerCase();
+      if (qNom || qRut || qCor) {
+        lista = lista.filter((u) => {
+          const matchNom = !qNom || (u.Usuario_Nombre_Completo || "").toLowerCase().includes(qNom);
+          const matchRut = !qRut || (u.Usuario_RUT || "").toLowerCase().includes(qRut);
+          const userEmails = [
+            u.Usuario_Correo,
+            u.Administrador_Correo_Institucional,
+            u.Docente_Correo_Institucional,
+            u.Apoderado_Correo_Natural,
+          ].filter(Boolean).map(c => String(c).toLowerCase());
+          const matchCor = !qCor || userEmails.some(c => c.includes(qCor));
+          return matchNom && matchRut && matchCor;
+        });
+      }
+      setUsuarios(lista);
+      if (lista.length === 0) {
+        setMensajeInfo(data?.mensaje || "No se encontraron usuarios");
       }
     } catch (error) {
       if (!vigente()) return;
@@ -156,7 +171,7 @@ function BuscarUsuarios() {
           </thead>
           <tbody>
             {usuarios.map((u, idx) => (
-              <tr key={u.Usuario_Id}>
+              <tr key={`${u.Usuario_Id || "u"}-${u.Usuario_RUT || idx}-${idx}`}>
                 <td>{idx + 1}</td>
                 <td>{u.Usuario_Nombre_Completo}</td>
                 <td>{u.Usuario_RUT}</td>

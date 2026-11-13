@@ -32,7 +32,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
     getEstudiantesDeCurso(curso.Curso_Id)
       .then((d) => {
         if (!vivo) return;
-        setEstudiantes(Array.isArray(d?.estudiantes) ? d.estudiantes : []);
+        setEstudiantes(Array.isArray(d?.estudiantes) ? d.estudiantes : Array.isArray(d) ? d : []);
         setMensajeEstudiantes(d?.mensaje || "");
         setPermiteRuta(Boolean(d?.curso?.Permite_Ruta));
       })
