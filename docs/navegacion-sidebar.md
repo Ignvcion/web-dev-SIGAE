@@ -52,9 +52,7 @@ const esApoderado  = rolEfectivo === "Apoderado";
 
 ## Pendientes conocidos
 
-- **Gestión de Roles:** el enlace solo lo ve el Super Admin, pero la ruta `/gestion-roles`
-  admite `roles={["Administrador"]}`, y `GestionRoles.jsx` permite a un Administrador
-  normal gestionar roles de Docente/Apoderado. Hay que decidir cuál de los dos manda.
+- **Gestión de Roles (Resuelto C-01):** el enlace en el sidebar ahora está disponible para Administrador y Super Admin. Un Administrador normal puede gestionar roles de Docente/Apoderado, mientras que la asignación del rol Administrador queda reservada exclusivamente al Super Admin.
 - **Mis Estudiantes del apoderado (CU40):** no hay enlace ni ruta.
   `components/ListaEstudiantesApoderado.jsx` es un mock estático que `AppRouter.jsx`
   importa pero no usa en ninguna ruta.

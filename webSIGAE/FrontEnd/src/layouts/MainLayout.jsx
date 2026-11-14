@@ -140,11 +140,9 @@ function MainLayout() {
                         </Link>
                       )}
 
-                      {esSuperAdmin && (
-                        <Link to="/gestion-roles">
-                          Gestión de Roles
-                        </Link>
-                      )}
+                      <Link to="/gestion-roles">
+                        Gestión de Roles
+                      </Link>
 
                       <Link to="/docentes">
                         Gestión de Docentes
