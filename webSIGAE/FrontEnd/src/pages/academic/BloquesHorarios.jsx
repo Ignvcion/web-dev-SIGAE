@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
@@ -168,7 +168,7 @@ export default function BloquesHorarios() {
       </div>
 
       {/* Pestañas */}
-      <div style={s.tabBar}>
+      <div style={s.tabBar} className="bloques-tabs-bar">
         {[
           { key: "parametros", label: "⚙ Parámetros institucionales" },
           { key: "bloques",    label: "🕐 Bloques horarios" },
@@ -176,8 +176,10 @@ export default function BloquesHorarios() {
         ].map((t) => (
           <button
             key={t.key}
+            type="button"
             onClick={() => setTab(t.key)}
             style={{ ...s.tabBtn, ...(tab === t.key ? s.tabBtnActive : {}) }}
+            className={`bloques-tab-btn${tab === t.key ? " active" : ""}`}
           >
             {t.label}
           </button>
@@ -1268,8 +1270,11 @@ function TabEventos() {
 
   useEffect(() => { pedir(); }, [pedir]);
 
-  const abrirCrear = () => {
-    setForm(EMPTY_EVENTO);
+  const abrirCrear = (fechaPuntual = "") => {
+    setForm({
+      ...EMPTY_EVENTO,
+      Evento_Institucional_Fecha: typeof fechaPuntual === "string" ? fechaPuntual : "",
+    });
     setEditando(null);
     setErrorPanel("");
     setBloquesAfectados([]);
@@ -1350,30 +1355,58 @@ function TabEventos() {
 
   return (
     <div style={s.seccion}>
-      <div style={{ ...s.seccionHeader, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-        <div>
-          <h2 style={s.seccionTitulo}>Eventos institucionales</h2>
-          <p style={s.seccionDesc}>
-            Registra excepciones que afectan el desarrollo normal de clases: retiros tempranos,
-            suspensiones parciales o totales de jornada.
-          </p>
+      <div style={{ ...s.seccionHeader, marginBottom: "0.75rem" }}>
+        <h2 style={s.seccionTitulo}>Eventos institucionales</h2>
+        <p style={s.seccionDesc}>
+          Registra excepciones que afectan el desarrollo normal de clases: retiros tempranos,
+          suspensiones parciales o totales de jornada.
+        </p>
+      </div>
+
+      <div className="eventos-toolbar" style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "0.6rem",
+        marginBottom: "1rem",
+      }}>
+        <div style={{ display: "inline-flex", border: "1px solid #cbd5e1", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+          <button
+            type="button"
+            onClick={() => setVista("calendario")}
+            style={{
+              padding: "0.4rem 0.8rem",
+              border: "none",
+              cursor: "pointer",
+              background: vista === "calendario" ? "#1e3a5f" : "#f9fafb",
+              color: vista === "calendario" ? "#fff" : "#6b7280",
+              fontSize: "0.82rem",
+              fontWeight: vista === "calendario" ? 700 : 500,
+            }}
+          >
+            📅 Semana
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista("lista")}
+            style={{
+              padding: "0.4rem 0.8rem",
+              border: "none",
+              borderLeft: "1px solid #cbd5e1",
+              cursor: "pointer",
+              background: vista === "lista" ? "#1e3a5f" : "#f9fafb",
+              color: vista === "lista" ? "#fff" : "#6b7280",
+              fontSize: "0.82rem",
+              fontWeight: vista === "lista" ? 700 : 500,
+            }}
+          >
+            ☰ Lista
+          </button>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-            <button onClick={() => setVista("calendario")}
-              style={{ padding: "0.35rem 0.75rem", border: "none", cursor: "pointer",
-                background: vista === "calendario" ? "#1e3a5f" : "#f9fafb",
-                color: vista === "calendario" ? "#fff" : "#6b7280",
-                fontSize: "0.82rem", fontWeight: 500 }}>📅 Semana</button>
-            <button onClick={() => setVista("lista")}
-              style={{ padding: "0.35rem 0.75rem", border: "none", borderLeft: "1px solid #e5e7eb",
-                cursor: "pointer",
-                background: vista === "lista" ? "#1e3a5f" : "#f9fafb",
-                color: vista === "lista" ? "#fff" : "#6b7280",
-                fontSize: "0.82rem", fontWeight: 500 }}>☰ Lista</button>
-          </div>
-          <button style={s.btnSecundario} onClick={() => setModalJornada(true)}>⏸ Suspender jornada completa</button>
-          <button className="btn-primary" onClick={abrirCrear}>+ Nuevo evento</button>
+          <button type="button" style={s.btnSecundario} onClick={() => setModalJornada(true)}>⏸ Suspender jornada completa</button>
+          <button type="button" className="btn-primary" onClick={() => abrirCrear()}>+ Nuevo evento</button>
         </div>
       </div>
 
@@ -1401,6 +1434,7 @@ function TabEventos() {
               onVerDetalle={(ev) => setDetalleId(ev.Evento_Institucional_Id)}
               onEditar={abrirEditar}
               onEliminar={handleEliminar}
+              onCrear={abrirCrear}
               eliminando={eliminando}
             />
           ) : (
@@ -1839,6 +1873,11 @@ const IMPACTO_COLORES = {
 };
 
 const DIAS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DIAS_COMPLETOS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const MESES_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+];
 
 function lunesDe(fecha) {
   const d = new Date(fecha);
@@ -1852,68 +1891,112 @@ function toISODate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, eliminando }) {
-  const [lunes,   setLunes]   = useState(() => lunesDe(new Date()));
+function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, onCrear, eliminando }) {
+  const [lunes, setLunes] = useState(() => lunesDe(new Date()));
   const [hovered, setHovered] = useState(null);
   const [modoDias, setModoDias] = useState("habiles"); // "habiles" (Lun-Vie) | "todos" (Lun-Dom)
+  const [vistaMovilModo, setVistaMovilModo] = useState("dia"); // "dia" (por día) | "grilla" (semana completa)
+  const [diaSeleccionadoISO, setDiaSeleccionadoISO] = useState(() => toISODate(new Date()));
 
   const hoyISO = toISODate(new Date());
 
-  const diasTodos = Array.from({ length: 7 }, (_, i) => {
+  const diasTodos = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date(lunes);
     d.setDate(d.getDate() + i);
     return d;
-  });
+  }), [lunes]);
 
   // Si la semana actual contiene algún evento en sábado o domingo, incluir fin de semana automáticamente
-  const hayEventoFinde = eventos.some(ev => {
+  const hayEventoFinde = useMemo(() => eventos.some((ev) => {
     const f = ev.Evento_Institucional_Fecha?.slice(0, 10);
     return f === toISODate(diasTodos[5]) || f === toISODate(diasTodos[6]);
-  });
+  }), [eventos, diasTodos]);
 
   const mostrarFinde = modoDias === "todos" || hayEventoFinde;
-  const diasAMostrar = mostrarFinde ? diasTodos : diasTodos.slice(0, 5);
+  const diasAMostrar = useMemo(() => (mostrarFinde ? diasTodos : diasTodos.slice(0, 5)), [mostrarFinde, diasTodos]);
 
-  const prevSemana = () => { const d = new Date(lunes); d.setDate(d.getDate() - 7); setLunes(d); };
-  const nextSemana = () => { const d = new Date(lunes); d.setDate(d.getDate() + 7); setLunes(d); };
-  const irHoy      = () => setLunes(lunesDe(new Date()));
+  const prevSemana = () => {
+    const d = new Date(lunes);
+    d.setDate(d.getDate() - 7);
+    setLunes(d);
+  };
+  const nextSemana = () => {
+    const d = new Date(lunes);
+    d.setDate(d.getDate() + 7);
+    setLunes(d);
+  };
+  const irHoy = () => setLunes(lunesDe(new Date()));
 
-  const primerDia  = diasAMostrar[0];
-  const ultimoDia  = diasAMostrar[diasAMostrar.length - 1];
-  const primerISO  = toISODate(primerDia);
-  const ultimoISO  = toISODate(ultimoDia);
+  const primerDia = diasAMostrar[0];
+  const ultimoDia = diasAMostrar[diasAMostrar.length - 1];
+  const primerISO = toISODate(primerDia);
+  const ultimoISO = toISODate(ultimoDia);
 
   const rangoLabel = `${primerDia.toLocaleDateString("es-CL", { day: "numeric", month: "short" })} – ${ultimoDia.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}`;
 
-  const eventosEstaSemana = eventos.filter(ev => {
+  const eventosEstaSemana = useMemo(() => eventos.filter((ev) => {
     const f = ev.Evento_Institucional_Fecha?.slice(0, 10);
     return f >= primerISO && f <= ultimoISO;
-  });
+  }), [eventos, primerISO, ultimoISO]);
+
+  // Determinar qué día está activo en la vista móvil de día
+  const diaActivoISO = useMemo(() => {
+    const estaEnSemana = diasAMostrar.some((d) => toISODate(d) === diaSeleccionadoISO);
+    if (estaEnSemana) return diaSeleccionadoISO;
+    const conEvento = diasAMostrar.find((d) =>
+      eventos.some((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10) === toISODate(d))
+    );
+    return conEvento ? toISODate(conEvento) : primerISO;
+  }, [diasAMostrar, diaSeleccionadoISO, eventos, primerISO]);
+
+  const diaActivoObj = useMemo(() => {
+    const encontrado = diasAMostrar.find((d) => toISODate(d) === diaActivoISO);
+    if (encontrado) return encontrado;
+    const [y, m, d] = diaActivoISO.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [diasAMostrar, diaActivoISO]);
+
+  const eventosDelDiaActivo = useMemo(() => {
+    return eventos.filter((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaActivoISO);
+  }, [eventos, diaActivoISO]);
 
   const btnNav = {
-    padding: "0.3rem 0.65rem", border: "1px solid #e5e7eb", borderRadius: 6,
-    background: "#fff", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600, color: "#374151",
+    padding: "0.35rem 0.7rem",
+    border: "1px solid #e2e8f0",
+    borderRadius: 7,
+    background: "#fff",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    color: "#374151",
+    minHeight: 34,
   };
 
-  const minGridWidth = diasAMostrar.length === 5 ? 650 : 840;
-
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+    <div className="cal-card-container" style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
       {/* Barra superior de controles */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 16px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc", flexWrap: "wrap", gap: "0.6rem"
+      <div className="cal-header-bar" style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 14px",
+        borderBottom: "1px solid #e5e7eb",
+        background: "#f8fafc",
+        flexWrap: "wrap",
+        gap: "0.6rem",
       }}>
-        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          <button onClick={prevSemana} style={btnNav} title="Semana anterior">‹</button>
-          <button onClick={nextSemana} style={btnNav} title="Semana siguiente">›</button>
+        {/* Navegación anterior / hoy / siguiente */}
+        <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+          <button onClick={prevSemana} style={btnNav} title="Semana anterior" aria-label="Semana anterior">‹</button>
+          <button onClick={nextSemana} style={btnNav} title="Semana siguiente" aria-label="Semana siguiente">›</button>
           <button onClick={irHoy} style={{ ...btnNav, fontSize: "0.78rem", color: "#1e40af", borderColor: "#93c5fd" }}>Hoy</button>
         </div>
 
+        {/* Rango de fechas y contador */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-          <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e3a5f" }}>{rangoLabel}</span>
+          <span style={{ fontWeight: 700, fontSize: "0.92rem", color: "#1e3a5f" }}>{rangoLabel}</span>
           <span style={{
-            fontSize: "0.74rem",
+            fontSize: "0.72rem",
             fontWeight: 600,
             color: eventosEstaSemana.length > 0 ? "#1e40af" : "#64748b",
             background: eventosEstaSemana.length > 0 ? "#dbeafe" : "#f1f5f9",
@@ -1921,229 +2004,432 @@ function VistaCalendarioEventos({ eventos, onVerDetalle, onEditar, onEliminar, e
             borderRadius: 10,
           }}>
             {eventosEstaSemana.length === 0
-              ? "Sin eventos esta semana"
-              : `${eventosEstaSemana.length} evento${eventosEstaSemana.length !== 1 ? "s" : ""} esta semana`}
+              ? "Sin eventos"
+              : `${eventosEstaSemana.length} evento${eventosEstaSemana.length !== 1 ? "s" : ""}`}
           </span>
         </div>
 
-        {/* Selector de modo días */}
-        <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff" }}>
-          <button
-            type="button"
-            onClick={() => setModoDias("habiles")}
-            style={{
-              padding: "0.3rem 0.65rem",
-              border: "none",
-              background: !mostrarFinde ? "#1e3a5f" : "#fff",
-              color: !mostrarFinde ? "#fff" : "#475569",
-              fontWeight: !mostrarFinde ? 700 : 500,
-              fontSize: "0.75rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            Lun–Vie
-          </button>
-          <button
-            type="button"
-            onClick={() => setModoDias("todos")}
-            style={{
-              padding: "0.3rem 0.65rem",
-              border: "none",
-              borderLeft: "1px solid #cbd5e1",
-              background: mostrarFinde ? "#1e3a5f" : "#fff",
-              color: mostrarFinde ? "#fff" : "#475569",
-              fontWeight: mostrarFinde ? 700 : 500,
-              fontSize: "0.75rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            7 días{hayEventoFinde ? " •" : ""}
-          </button>
+        {/* Selectores de modo */}
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Toggle móvil: Día vs Grilla */}
+          <div className="cal-mobile-toggle" style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff" }}>
+            <button
+              type="button"
+              onClick={() => setVistaMovilModo("dia")}
+              style={{
+                padding: "0.3rem 0.6rem",
+                border: "none",
+                background: vistaMovilModo === "dia" ? "#1e3a5f" : "#fff",
+                color: vistaMovilModo === "dia" ? "#fff" : "#475569",
+                fontWeight: vistaMovilModo === "dia" ? 700 : 500,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+              }}
+            >
+              📱 Día
+            </button>
+            <button
+              type="button"
+              onClick={() => setVistaMovilModo("grilla")}
+              style={{
+                padding: "0.3rem 0.6rem",
+                border: "none",
+                borderLeft: "1px solid #cbd5e1",
+                background: vistaMovilModo === "grilla" ? "#1e3a5f" : "#fff",
+                color: vistaMovilModo === "grilla" ? "#fff" : "#475569",
+                fontWeight: vistaMovilModo === "grilla" ? 700 : 500,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+              }}
+            >
+              📊 Grilla
+            </button>
+          </div>
+
+          {/* Selector de modo días (Lun-Vie vs 7 días) */}
+          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff" }}>
+            <button
+              type="button"
+              onClick={() => setModoDias("habiles")}
+              style={{
+                padding: "0.3rem 0.6rem",
+                border: "none",
+                background: !mostrarFinde ? "#1e3a5f" : "#fff",
+                color: !mostrarFinde ? "#fff" : "#475569",
+                fontWeight: !mostrarFinde ? 700 : 500,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+              }}
+            >
+              Lun–Vie
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoDias("todos")}
+              style={{
+                padding: "0.3rem 0.6rem",
+                border: "none",
+                borderLeft: "1px solid #cbd5e1",
+                background: mostrarFinde ? "#1e3a5f" : "#fff",
+                color: mostrarFinde ? "#fff" : "#475569",
+                fontWeight: mostrarFinde ? 700 : 500,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+              }}
+            >
+              7 días{hayEventoFinde ? " •" : ""}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Indicador de desplazamiento horizontal */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "4px 14px",
-        background: "#f1f5f9",
-        borderBottom: "1px solid #e2e8f0",
-        fontSize: "0.72rem",
-        color: "#64748b",
-      }}>
-        <span>⇄ Desliza horizontalmente para ver todos los días</span>
-        <span>{diasAMostrar.length} días ({mostrarFinde ? "Semana completa" : "Días hábiles"})</span>
-      </div>
+      {/* ── VISTA MÓVIL: MODO DÍA A DÍA ── */}
+      <div className={`cal-mobile-view-container${vistaMovilModo === "dia" ? " is-active" : ""}`}>
+        {/* Selector horizontal de días con badges */}
+        <div className="cal-day-strip">
+          {diasAMostrar.map((dia) => {
+            const diaISO = toISODate(dia);
+            const esHoy = diaISO === hoyISO;
+            const esSeleccionado = diaISO === diaActivoISO;
+            const eventosDia = eventos.filter((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaISO);
+            const cantEventos = eventosDia.length;
+            const diaSemanaIdx = (dia.getDay() + 6) % 7;
+            return (
+              <button
+                key={diaISO}
+                type="button"
+                onClick={() => setDiaSeleccionadoISO(diaISO)}
+                className={`cal-day-pill${esSeleccionado ? " cal-day-pill--active" : ""}${esHoy ? " cal-day-pill--today" : ""}`}
+              >
+                <span className="cal-day-pill-name">{DIAS_ES[diaSemanaIdx]}</span>
+                <span className="cal-day-pill-num">{dia.getDate()}</span>
+                {cantEventos > 0 && (
+                  <span className="cal-day-pill-badge">{cantEventos}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Grid del calendario con scroll horizontal */}
-      <div
-        className="calendario-eventos-scroll"
-        style={{
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-          width: "100%",
-        }}
-      >
-        <div style={{ minWidth: minGridWidth }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${diasAMostrar.length}, minmax(0, 1fr))`,
-            width: "100%",
-          }}>
-            {diasAMostrar.map((dia, i) => {
-              const diaISO        = toISODate(dia);
-              const esHoy         = diaISO === hoyISO;
-              const esPasado      = diaISO < hoyISO;
-              const esFinde       = dia.getDay() === 0 || dia.getDay() === 6;
-              const diaSemanaIdx  = (dia.getDay() + 6) % 7; // 0=Lun, 6=Dom
-              const eventosDelDia = eventos.filter(ev => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaISO);
+        {/* Tarjetas de eventos del día seleccionado */}
+        <div className="cal-day-details">
+          <div className="cal-day-details-head">
+            <div>
+              <span className="cal-day-details-title">
+                {DIAS_COMPLETOS[(diaActivoObj.getDay() + 6) % 7]}, {diaActivoObj.getDate()} de {MESES_ES[diaActivoObj.getMonth()]}
+              </span>
+              <span style={{ fontSize: "0.75rem", color: "#64748b", marginLeft: 8 }}>
+                ({eventosDelDiaActivo.length} {eventosDelDiaActivo.length === 1 ? "evento" : "eventos"})
+              </span>
+            </div>
+            {diaActivoISO === hoyISO && <span className="cal-tag-hoy">Hoy</span>}
+          </div>
 
-              return (
-                <div key={diaISO} style={{
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                  borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
-                  borderTop: "1px solid #e5e7eb",
-                  minHeight: 125,
-                  background: esHoy ? "#eff6ff" : esFinde ? "#fbfbfe" : "#fff",
-                  opacity: esPasado && !esHoy ? 0.75 : 1,
-                  display: "flex",
-                  flexDirection: "column",
-                }}>
-                  {/* Encabezado del día */}
-                  <div style={{
-                    padding: "8px 6px 6px",
-                    borderBottom: "1px solid #f3f4f6",
-                    textAlign: "center",
-                    background: esHoy ? "rgba(30, 64, 175, 0.05)" : "transparent",
-                  }}>
-                    <div style={{
-                      fontSize: "0.68rem",
-                      color: esHoy ? "#1e40af" : esFinde ? "#9ca3af" : "#64748b",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}>
-                      {DIAS_ES[diaSemanaIdx]}
+          {eventosDelDiaActivo.length === 0 ? (
+            <div className="cal-day-empty">
+              <p style={{ margin: "0 0 8px", color: "#64748b" }}>
+                Sin eventos institucionales este día.
+              </p>
+              {typeof onCrear === "function" && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => onCrear(diaActivoISO)}
+                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem" }}
+                >
+                  + Agregar evento en este día
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="cal-day-cards-list">
+              {eventosDelDiaActivo.map((ev) => {
+                const col = IMPACTO_COLORES[ev.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
+                return (
+                  <div
+                    key={ev.Evento_Institucional_Id}
+                    className="cal-event-detail-card"
+                    style={{ borderLeftColor: col.acento, background: col.bg }}
+                  >
+                    <div className="cal-event-detail-head">
+                      <div className="cal-event-detail-title" style={{ color: col.acento }}>
+                        {col.icono} {ev.Evento_Institucional_Nombre}
+                      </div>
+                      <div className="cal-event-detail-badges">
+                        <span className="cal-impacto-pill" style={{ borderColor: col.borde, color: col.acento }}>
+                          {ev.Evento_Institucional_Impacto_Clases}
+                        </span>
+                        {ev.bloques_afectados_count > 0 && (
+                          <span className="cal-bloques-pill">
+                            {ev.bloques_afectados_count} bloque(s) afectado(s)
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1, marginTop: 3,
-                      color: esHoy ? "#fff" : esFinde ? "#9ca3af" : "#1e3a5f",
-                      background: esHoy ? "#1e40af" : "transparent",
-                      borderRadius: "50%", width: 28, height: 28,
-                      display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      {dia.getDate()}
+                    {ev.Evento_Institucional_Descripcion && (
+                      <p className="cal-event-detail-desc">{ev.Evento_Institucional_Descripcion}</p>
+                    )}
+                    <div className="cal-event-detail-actions">
+                      <button type="button" className="btn-secondary" onClick={() => onVerDetalle(ev)}>
+                        👁 Ver detalle
+                      </button>
+                      <button type="button" className="btn-secondary" onClick={() => onEditar(ev)}>
+                        ✏ Editar
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          padding: "0.4rem 0.75rem",
+                          borderRadius: 6,
+                          border: "1px solid #fecaca",
+                          background: "#fee2e2",
+                          color: "#991b1b",
+                          fontSize: "0.82rem",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                        disabled={eliminando === ev.Evento_Institucional_Id}
+                        onClick={() => {
+                          if (window.confirm("¿Eliminar este evento? Los bloques que quedaron marcados como afectados se liberarán.")) {
+                            onEliminar(ev.Evento_Institucional_Id);
+                          }
+                        }}
+                      >
+                        {eliminando === ev.Evento_Institucional_Id ? "..." : "🗑 Eliminar"}
+                      </button>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-                  {/* Lista de eventos del día */}
-                  <div style={{
-                    padding: "6px 5px",
+      {/* ── VISTA GRILLA SEMANAL (Siempre activa en escritorio, opcional en móvil) ── */}
+      <div className={`cal-grid-view-container${vistaMovilModo === "grilla" ? " is-active" : ""}`}>
+        {/* Indicador de scroll horizontal en móvil */}
+        <div className="cal-grid-scroll-hint" style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "5px 14px",
+          background: "#f1f5f9",
+          borderBottom: "1px solid #e2e8f0",
+          fontSize: "0.72rem",
+          color: "#64748b",
+        }}>
+          <span>⇄ Desliza horizontalmente para ver todos los días</span>
+          <span>{diasAMostrar.length} días ({mostrarFinde ? "Semana completa" : "Días hábiles"})</span>
+        </div>
+
+        <div className="calendario-eventos-scroll" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
+          <div className="cal-grid-inner" style={{ minWidth: diasAMostrar.length === 5 ? 650 : 840, width: "100%" }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${diasAMostrar.length}, minmax(0, 1fr))`,
+              width: "100%",
+            }}>
+              {diasAMostrar.map((dia, i) => {
+                const diaISO = toISODate(dia);
+                const esHoy = diaISO === hoyISO;
+                const esPasado = diaISO < hoyISO;
+                const esFinde = dia.getDay() === 0 || dia.getDay() === 6;
+                const diaSemanaIdx = (dia.getDay() + 6) % 7;
+                const eventosDelDia = eventos.filter((ev) => ev.Evento_Institucional_Fecha?.slice(0, 10) === diaISO);
+
+                return (
+                  <div key={diaISO} className="cal-grid-col" style={{
+                    minWidth: 0,
+                    boxSizing: "border-box",
+                    borderLeft: i > 0 ? "1px solid #e5e7eb" : "none",
+                    borderTop: "1px solid #e5e7eb",
+                    minHeight: 130,
+                    background: esHoy ? "#eff6ff" : esFinde ? "#fbfbfe" : "#fff",
+                    opacity: esPasado && !esHoy ? 0.75 : 1,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 5,
-                    flex: 1,
-                    minWidth: 0,
                   }}>
-                    {eventosDelDia.length === 0 ? (
+                    {/* Encabezado del día en la grilla */}
+                    <div style={{
+                      padding: "8px 6px 6px",
+                      borderBottom: "1px solid #f3f4f6",
+                      textAlign: "center",
+                      background: esHoy ? "rgba(30, 64, 175, 0.05)" : "transparent",
+                    }}>
                       <div style={{
-                        padding: "16px 2px",
-                        textAlign: "center",
-                        color: "#cbd5e1",
                         fontSize: "0.68rem",
-                        fontStyle: "italic",
+                        color: esHoy ? "#1e40af" : esFinde ? "#9ca3af" : "#64748b",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
                       }}>
-                        —
+                        {DIAS_ES[diaSemanaIdx]}
                       </div>
-                    ) : (
-                      eventosDelDia.map(ev => {
-                        const col   = IMPACTO_COLORES[ev.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
-                        const isHov = hovered === ev.Evento_Institucional_Id;
-                        return (
-                          <div key={ev.Evento_Institucional_Id}
-                            onMouseEnter={() => setHovered(ev.Evento_Institucional_Id)}
-                            onMouseLeave={() => setHovered(null)}
-                            onClick={() => onVerDetalle(ev)}
-                            title={`Ver detalle: ${ev.Evento_Institucional_Nombre}`}
-                            style={{
-                              background: col.bg,
-                              border: `1px solid ${col.borde}`,
-                              borderLeft: `3px solid ${col.acento}`,
-                              borderRadius: 6,
-                              padding: "4px 6px",
-                              cursor: "pointer",
-                              minWidth: 0,
-                              position: "relative",
-                              boxShadow: isHov ? "0 3px 10px rgba(0,0,0,0.12)" : "0 1px 2px rgba(0,0,0,0.04)",
-                              transition: "all 0.15s ease",
-                            }}>
-                            <div style={{
-                              fontWeight: 700,
-                              color: col.acento,
-                              fontSize: "0.72rem",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              paddingRight: isHov ? 36 : 0,
-                            }} title={ev.Evento_Institucional_Nombre}>
-                              {col.icono} {ev.Evento_Institucional_Nombre}
-                            </div>
-                            <div style={{
-                              fontSize: "0.62rem",
-                              color: col.acento,
-                              opacity: 0.9,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              flexWrap: "wrap",
-                              marginTop: 2,
-                            }}>
-                              <span style={{
-                                background: "rgba(255,255,255,0.75)",
-                                padding: "1px 4px",
-                                borderRadius: 3,
+                      <div style={{
+                        fontSize: "1.05rem", fontWeight: 700, lineHeight: 1, marginTop: 3,
+                        color: esHoy ? "#fff" : esFinde ? "#9ca3af" : "#1e3a5f",
+                        background: esHoy ? "#1e40af" : "transparent",
+                        borderRadius: "50%", width: 28, height: 28,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {dia.getDate()}
+                      </div>
+                    </div>
+
+                    {/* Lista de eventos del día en la grilla */}
+                    <div style={{
+                      padding: "6px 5px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 5,
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                    }}>
+                      {eventosDelDia.length === 0 ? (
+                        <div style={{
+                          padding: "16px 2px",
+                          textAlign: "center",
+                          color: "#cbd5e1",
+                          fontSize: "0.68rem",
+                          fontStyle: "italic",
+                        }}>
+                          —
+                        </div>
+                      ) : (
+                        eventosDelDia.map((ev) => {
+                          const col = IMPACTO_COLORES[ev.Evento_Institucional_Impacto_Clases] || IMPACTO_COLORES["Sin impacto"];
+                          const isHov = hovered === ev.Evento_Institucional_Id;
+                          return (
+                            <div
+                              key={ev.Evento_Institucional_Id}
+                              onMouseEnter={() => setHovered(ev.Evento_Institucional_Id)}
+                              onMouseLeave={() => setHovered(null)}
+                              onClick={() => onVerDetalle(ev)}
+                              title={`Ver detalle: ${ev.Evento_Institucional_Nombre}`}
+                              style={{
+                                background: col.bg,
+                                border: `1px solid ${col.borde}`,
+                                borderLeft: `3px solid ${col.acento}`,
+                                borderRadius: 6,
+                                padding: "4px 6px",
+                                cursor: "pointer",
+                                minWidth: 0,
+                                position: "relative",
+                                boxShadow: isHov ? "0 3px 10px rgba(0,0,0,0.12)" : "0 1px 2px rgba(0,0,0,0.04)",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <div style={{
+                                fontWeight: 700,
+                                color: col.acento,
+                                fontSize: "0.72rem",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
+                                paddingRight: isHov ? 36 : 0,
+                              }} title={ev.Evento_Institucional_Nombre}>
+                                {col.icono} {ev.Evento_Institucional_Nombre}
+                              </div>
+                              <div style={{
+                                fontSize: "0.62rem",
+                                color: col.acento,
+                                opacity: 0.9,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 3,
+                                flexWrap: "wrap",
+                                marginTop: 2,
+                                overflow: "hidden",
                               }}>
-                                {ev.Evento_Institucional_Impacto_Clases}
-                              </span>
-                              {ev.bloques_afectados_count > 0 && (
                                 <span style={{
-                                  fontWeight: 700,
                                   background: "rgba(255,255,255,0.75)",
                                   padding: "1px 4px",
                                   borderRadius: 3,
                                   whiteSpace: "nowrap",
+                                  maxWidth: "100%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
                                 }}>
-                                  · {ev.bloques_afectados_count} bloq.
+                                  {ev.Evento_Institucional_Impacto_Clases}
                                 </span>
+                                {ev.bloques_afectados_count > 0 && (
+                                  <span style={{
+                                    fontWeight: 700,
+                                    background: "rgba(255,255,255,0.75)",
+                                    padding: "1px 4px",
+                                    borderRadius: 3,
+                                    whiteSpace: "nowrap",
+                                  }}>
+                                    · {ev.bloques_afectados_count} bloq.
+                                  </span>
+                                )}
+                              </div>
+                              {isHov && (
+                                <div style={{ position: "absolute", top: 3, right: 3, display: "flex", gap: 2 }}>
+                                  <button
+                                    type="button"
+                                    title="Editar"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditar(ev);
+                                    }}
+                                    style={{
+                                      width: 18,
+                                      height: 18,
+                                      padding: 0,
+                                      border: "none",
+                                      borderRadius: 3,
+                                      cursor: "pointer",
+                                      background: col.acento,
+                                      color: "#fff",
+                                      fontSize: "0.6rem",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    ✏
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Eliminar"
+                                    disabled={eliminando === ev.Evento_Institucional_Id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm("¿Eliminar este evento?")) {
+                                        onEliminar(ev.Evento_Institucional_Id);
+                                      }
+                                    }}
+                                    style={{
+                                      width: 18,
+                                      height: 18,
+                                      padding: 0,
+                                      border: "none",
+                                      borderRadius: 3,
+                                      cursor: "pointer",
+                                      background: "#dc2626",
+                                      color: "#fff",
+                                      fontSize: "0.7rem",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
                               )}
                             </div>
-                            {isHov && (
-                              <div style={{ position: "absolute", top: 3, right: 3, display: "flex", gap: 2 }}>
-                                <button title="Editar" onClick={e => { e.stopPropagation(); onEditar(ev); }}
-                                  style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
-                                    cursor: "pointer", background: col.acento, color: "#fff",
-                                    fontSize: "0.55rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✏</button>
-                                <button title="Eliminar" disabled={eliminando === ev.Evento_Institucional_Id}
-                                  onClick={e => { e.stopPropagation(); if (window.confirm("¿Eliminar este evento?")) onEliminar(ev.Evento_Institucional_Id); }}
-                                  style={{ width: 16, height: 16, padding: 0, border: "none", borderRadius: 3,
-                                    cursor: "pointer", background: "#dc2626", color: "#fff",
-                                    fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -2427,12 +2713,12 @@ const s = {
   rolBadge: { padding: "4px 14px", borderRadius: 20, fontSize: "0.82rem", fontWeight: 700,
     background: "#dbeafe", color: "#1e40af", border: "1px solid #93c5fd", flexShrink: 0 },
 
-  tabBar:      { display: "flex", gap: "0.25rem", borderBottom: "2px solid #e5e7eb",
-    marginBottom: "1.5rem", flexWrap: "wrap" },
-  tabBtn:      { padding: "0.6rem 1.1rem", border: "none", background: "transparent",
-    cursor: "pointer", fontSize: "0.9rem", color: "#6b7280", borderRadius: "8px 8px 0 0",
-    fontWeight: 500, transition: "all .15s" },
-  tabBtnActive:{ background: "#1e3a5f", color: "#fff", fontWeight: 700 },
+  tabBar:      { display: "flex", gap: "0.35rem", borderBottom: "2px solid #e5e7eb",
+    marginBottom: "1.25rem", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", flexWrap: "nowrap" },
+  tabBtn:      { padding: "0.6rem 1rem", border: "1px solid transparent", borderBottom: "none", background: "#f8fafc",
+    cursor: "pointer", fontSize: "0.88rem", color: "#64748b", borderRadius: "8px 8px 0 0",
+    fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "all .15s" },
+  tabBtnActive:{ background: "#1e3a5f", color: "#fff", fontWeight: 700, borderColor: "#1e3a5f" },
   tabContent:  { },
 
   seccion:       { },
@@ -2454,7 +2740,7 @@ const s = {
     background: "#f0f4ff", border: "1px solid #dbeafe", borderRadius: 8,
     padding: "0.55rem 0.9rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#1e3a5f" },
 
-  statsRow:   { display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" },
+  statsRow:   { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem", marginBottom: "1rem" },
   tabla:      { width: "100%", borderCollapse: "collapse", minWidth: 560 },
   theadRow:   { background: "#1e3a5f", color: "#fff" },
   th:         { padding: "0.7rem 1rem", textAlign: "left", fontWeight: 600, fontSize: "0.85rem" },
