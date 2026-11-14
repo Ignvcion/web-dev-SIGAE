@@ -10,10 +10,11 @@ SIGAE es una plataforma web para la gestión académica y escolar, con módulos 
 
 | Capa                  | Tecnología        |
 | --------------------- | ----------------- |
-| Frontend              | Vite + React      |
-| Backend               | Node.js + Express |
-| Base de datos         | MariaDB / MySQL   |
-| Entorno de desarrollo | GitHub Codespaces |
+| Frontend / PWA        | Vite + React + Tailwind CSS + PWA (Service Worker) |
+| Backend               | Node.js + Express (API REST) |
+| Base de datos         | MariaDB / MySQL 8.0 |
+| Pruebas Automatizadas | Jest + Supertest (Backend) / ESLint (Frontend) |
+| Entorno de desarrollo | GitHub Codespaces / Windows (Git Bash) |
 
 ---
 
@@ -125,19 +126,69 @@ Toda la documentación, salvo este README, está en `docs/`. No agregues archivo
 
 ## 🔧 Variables de entorno
 
-El backend lee su configuración de `webSIGAE/BackEnd/.env`. Ese archivo **no se sube a git**: cada uno tiene el suyo. Lo que sí está en el repo es la plantilla, `webSIGAE/BackEnd/.env.example`.
+El sistema utiliza configuración desacoplada tanto en el servidor (backend) como en la aplicación cliente (frontend).
 
-- **No tienes que crearlo a mano:** los scripts de setup copian `.env.example` a `.env`. Si ya tenías un `.env` distinto, lo guardan en `.env.bak` antes de reemplazarlo.
-- **No hace falta editarlo**, tampoco en Windows: el setup crea en tu base de datos el usuario `sigae` que usa la plantilla.
-- **Si agregas una variable nueva** al backend, agrégala también en `.env.example` con un valor de ejemplo, para que le llegue al resto del equipo. Nunca pongas claves reales en la plantilla.
+### Backend (`webSIGAE/BackEnd/.env`)
 
-- **En producción** el `.env` se escribe a mano en el servidor con valores reales (ver [Deploy](#-deploy)). Con `NODE_ENV=production` el backend **no arranca** si falta una variable obligatoria: la plantilla marca cuáles son.
+El backend lee su configuración de `webSIGAE/BackEnd/.env`. Ese archivo **no se sube a git**: cada desarrollador y servidor tiene el suyo propio a partir de `webSIGAE/BackEnd/.env.example`.
 
-Si necesitas crearlo sin correr el setup, copia la plantilla:
+- **Generación automática:** los scripts de setup copian `.env.example` a `.env`. Si ya existía un `.env` previo, lo respaldan en `.env.bak`.
+- **Configuración estándar local:** no requiere edición para pruebas locales básicas (el setup crea el usuario `sigae` con clave `sigae`).
+- **En producción (AWS EC2):** el archivo se configura con credenciales seguras de RDS, `NODE_ENV=production`, `JWT_SECRET` criptográfico de 32+ bytes y parámetros SMTP institucionales.
+
+Para crearlo manualmente a partir de la plantilla:
 
 ```bash
 cp webSIGAE/BackEnd/.env.example webSIGAE/BackEnd/.env
 ```
+
+### Frontend / PWA (`webSIGAE/FrontEnd/.env`)
+
+La aplicación cliente de Vite/React consume variables de entorno prefijadas con `VITE_` definidas en `webSIGAE/FrontEnd/.env` (basado en `webSIGAE/FrontEnd/.env.example`):
+
+| Variable | Propósito | Valor por defecto (desarrollo) | Producción |
+| --- | --- | --- | --- |
+| `VITE_API_URL` | URL base de la API REST del backend | `http://localhost:3000` | `https://tu-dominio` o vacío si Nginx actúa como reverse proxy en `/api` |
+| `VITE_BASE` | Ruta base de despliegue para Vite y PWA | `/` | `/` |
+
+Para inicializar la configuración del frontend:
+
+```bash
+cp webSIGAE/FrontEnd/.env.example webSIGAE/FrontEnd/.env
+```
+
+---
+
+## 🧪 Pruebas automatizadas y aseguramiento de calidad
+
+El proyecto cuenta con una suite integral de pruebas automatizadas y reglas de estilo para garantizar la estabilidad del software:
+
+### 1. Pruebas Unitarias y de Integración (Backend)
+Ejecutadas con Jest y Supertest, cubriendo autenticación, gestión de horarios, detección de colisiones, citaciones, mensajería, transacciones de roles y estudiantes:
+
+```bash
+cd webSIGAE/BackEnd
+npm test
+```
+> Resultado esperado: **55 suites de pruebas superadas, 740+ tests unitarios y de integración exitosos (0 fallos).**
+
+### 2. Análisis Estático y Linter (Frontend)
+Ejecutado con ESLint sobre componentes React, utilidades y hooks:
+
+```bash
+cd webSIGAE/FrontEnd
+npm run lint
+```
+> Resultado esperado: **0 errores de sintaxis o inconsistencias de código.**
+
+### 3. Compilación de Producción (Frontend / PWA)
+Verifica que el empaquetado de Vite y Tailwind CSS compile sin advertencias ni roturas de tipos:
+
+```bash
+cd webSIGAE/FrontEnd
+npm run build
+```
+> Genera el directorio optimizado `webSIGAE/FrontEnd/dist/` listo para ser servido por Nginx.
 
 ---
 
