@@ -460,7 +460,7 @@ function ConsultaHorarios() {
               : campoSelect("ch-libres-dia", "Día", criteriosLibres.dia_semana, cambiarCriterioLibre("dia_semana"), opcionesDias, "Todos los días")}
             {campoSelect("ch-libres-jornada", "Jornada", criteriosLibres.jornada, cambiarCriterioLibre("jornada"), opcionesJornadas, "Todas las jornadas")}
             <div className="ch-campo">
-              <label htmlFor="ch-libres-fecha">Fecha (opcional):</label>
+              <label htmlFor="ch-libres-fecha">Fecha:</label>
               <div className="ch-fecha-wrap">
                 <input
                   id="ch-libres-fecha"
@@ -469,8 +469,20 @@ function ConsultaHorarios() {
                   aria-label="Fecha (opcional)"
                   title="Fecha a evaluar (opcional)"
                   value={criteriosLibres.fecha}
+                  onClick={(e) => {
+                    try {
+                      e.target.showPicker?.();
+                    } catch {
+                      // Ignorar si el navegador no soporta showPicker
+                    }
+                  }}
                   onChange={cambiarCriterioLibre("fecha")}
                 />
+                {!criteriosLibres.fecha && (
+                  <span className="ch-fecha-placeholder">
+                    Fecha (opcional)
+                  </span>
+                )}
                 {criteriosLibres.fecha && (
                   <button
                     type="button"

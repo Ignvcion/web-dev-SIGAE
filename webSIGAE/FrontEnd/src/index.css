@@ -3479,10 +3479,25 @@ body {
 }
 
 .ch-fecha-wrap {
+  position: relative;
   display: flex;
   gap: 6px;
   align-items: stretch;
   min-width: 0;
+}
+
+.ch-fecha-placeholder {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 0.88rem;
+  pointer-events: none;
+  background: #fff;
+  padding-right: 6px;
+  user-select: none;
+  white-space: nowrap;
 }
 
 .ch-input-date {
@@ -3609,6 +3624,11 @@ body {
   .ch-filtros-grid .usuarios-select {
     min-height: 44px;
     font-size: 16px;
+  }
+
+  .ch-fecha-placeholder {
+    font-size: 15px;
+    left: 12px;
   }
 
   .ch-btn-quitar-fecha {
