@@ -96,6 +96,24 @@ function MainLayout() {
               <div className="rol-badge">
                 {rolEfectivo || "Usuario"}
               </div>
+
+              {usuario?.roles && usuario.roles.length > 1 && (
+                <div style={{ marginTop: "4px" }}>
+                  <Link
+                    to="/seleccionar-rol"
+                    style={{
+                      fontSize: "11px",
+                      color: "#93c5fd",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      display: "inline-block"
+                    }}
+                    title="Cambiar de perfil activo"
+                  >
+                    ⇄ Cambiar perfil ({usuario.roles.length})
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
