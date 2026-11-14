@@ -7,10 +7,10 @@ import {
   getHistorialCitaciones,
 } from "../../services/api";
 import {
-  CATEGORIAS_AGENDA,
   categoriaCitacion,
   descripcionEstadoDetalle,
   esCancelada,
+  esConfirmada,
   esPendiente,
   fechaISO,
   formatearFecha,
@@ -20,6 +20,14 @@ import {
 } from "../../utils/citaciones";
 import { normalizarTexto } from "../../utils/validaciones";
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
+
+const CATEGORIAS_HISTORIAL = [
+  { clave: "todas", etiqueta: "Todos los estados" },
+  { clave: "pendiente", etiqueta: "Pendientes" },
+  { clave: "futura", etiqueta: "Futuras / Próximas" },
+  { clave: "confirmada", etiqueta: "Confirmadas" },
+  { clave: "cancelada", etiqueta: "Canceladas" },
+];
 
 const esConsistente = (c) =>
   Boolean(c && c.Citacion_Id && /^\d{4}-\d{2}-\d{2}$/.test(fechaISO(c.Citacion_Fecha)) && c.Citacion_Estado);
@@ -172,9 +180,23 @@ function HistorialCitaciones() {
   const nombreEstudianteActivo = estudianteActual?.Estudiante_Nombre_Completo || citaciones[0]?.Estudiante_Nombre_Completo || "";
   const cursoEstudianteActivo = estudianteActual?.Curso_Nombre || citaciones[0]?.Curso_Nombre || "";
 
+  // Filtro de estado intuitivo:
+  // - "confirmada": todas las confirmadas (futuras o pasadas)
+  // - "futura": todas las próximas por realizarse (!yaPasoCitacion)
+  // - "pendiente": todas las pendientes de confirmación
+  // - "cancelada": todas las canceladas
+  const coincideEstado = (c, filtro) => {
+    if (!filtro || filtro === "todas") return true;
+    if (filtro === "pendiente") return esPendiente(c);
+    if (filtro === "futura") return !yaPasoCitacion(c);
+    if (filtro === "confirmada") return esConfirmada(c);
+    if (filtro === "cancelada") return esCancelada(c);
+    return categoriaCitacion(c) === filtro;
+  };
+
   const visibles = ordenarCronologicamente(
     citaciones.filter((c) => {
-      if (filtroActivo !== "todas" && categoriaCitacion(c) !== filtroActivo) {
+      if (!coincideEstado(c, filtroActivo)) {
         return false;
       }
       if (busquedaCitacion.trim()) {
@@ -185,13 +207,15 @@ function HistorialCitaciones() {
         const tramo = normalizarTexto(tramoCitacion(c) || "");
         const fecha = normalizarTexto(formatearFecha(c.Citacion_Fecha) || "");
         const estado = normalizarTexto(c.Citacion_Estado || "");
+        const obs = normalizarTexto(c.Citacion_Observaciones_Posteriores || "");
         const match =
           docente.includes(q) ||
           motivo.includes(q) ||
           modalidad.includes(q) ||
           tramo.includes(q) ||
           fecha.includes(q) ||
-          estado.includes(q);
+          estado.includes(q) ||
+          obs.includes(q);
         if (!match) return false;
       }
       return true;
@@ -199,11 +223,28 @@ function HistorialCitaciones() {
     ascendente
   );
 
-  const resumen = CATEGORIAS_AGENDA.filter((c) => c.clave !== "todas").map(({ clave, etiqueta }) => ({
-    clave,
-    etiqueta,
-    total: citaciones.filter((c) => categoriaCitacion(c) === clave).length,
-  }));
+  const resumen = [
+    {
+      clave: "pendiente",
+      etiqueta: "Pendientes",
+      total: citaciones.filter(esPendiente).length,
+    },
+    {
+      clave: "futura",
+      etiqueta: "Futuras",
+      total: citaciones.filter((c) => !yaPasoCitacion(c)).length,
+    },
+    {
+      clave: "confirmada",
+      etiqueta: "Confirmadas",
+      total: citaciones.filter(esConfirmada).length,
+    },
+    {
+      clave: "cancelada",
+      etiqueta: "Canceladas",
+      total: citaciones.filter(esCancelada).length,
+    },
+  ];
 
   return (
     <div className="usuarios-container">
@@ -224,7 +265,20 @@ function HistorialCitaciones() {
           className="usuarios-search"
           placeholder="Filtrar estudiantes por nombre o RUT..."
           value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setBusqueda(val);
+            const crit = normalizarTexto(val);
+            if (!crit) return;
+            const matches = estudiantes.filter(
+              (est) =>
+                normalizarTexto(est.Estudiante_Nombre_Completo || "").includes(crit) ||
+                normalizarTexto(est.Estudiante_RUT || "").includes(crit)
+            );
+            if (matches.length === 1 && String(matches[0].Estudiante_Id) !== String(estudianteId)) {
+              seleccionarEstudiante(matches[0].Estudiante_Id);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && estudiantesFiltrados.length > 0) {
               e.preventDefault();
@@ -359,8 +413,8 @@ function HistorialCitaciones() {
                   onChange={(e) => setFiltroEstado(e.target.value)}
                   aria-label="Filtrar por estado"
                 >
-                  {CATEGORIAS_AGENDA.map(({ clave, etiqueta }) => (
-                    <option key={clave} value={clave}>{clave === "todas" ? "Todos los estados" : etiqueta}</option>
+                  {CATEGORIAS_HISTORIAL.map(({ clave, etiqueta }) => (
+                    <option key={clave} value={clave}>{etiqueta}</option>
                   ))}
                 </select>
                 <button type="button" className="btn-vista" onClick={() => setAscendente((a) => !a)}>
