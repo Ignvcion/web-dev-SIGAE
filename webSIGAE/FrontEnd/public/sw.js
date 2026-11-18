@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sigae-pwa-v2';
+const CACHE_NAME = 'sigae-pwa-v3';
 const PRECACHE_ASSETS = [
   './manifest.json',
   './favicon.svg',
@@ -37,9 +37,18 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.includes('/api') || url.pathname.includes('/uploads')) return;
 
   // Navegación HTML: red primero para recibir siempre la versión más reciente
+  // Se guarda la última copia de la aplicación para poder abrirla sin conexión.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => caches.match('./index.html') || caches.match('./'))
+      fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            const copia = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copia));
+          }
+          return networkResponse;
+        })
+        .catch(async () => (await caches.match('./index.html')) || Response.error())
     );
     return;
   }
