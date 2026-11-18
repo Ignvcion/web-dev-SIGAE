@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../../services/api";
@@ -162,7 +162,6 @@ function GestionRoles() {
 
   const [busqueda, setBusqueda]                 = useState("");
   const [usuarios, setUsuarios]                 = useState([]);
-  const [resultados, setResultados]             = useState([]);
   const [seleccionado, setSeleccionado]         = useState(null);
   const [rolNuevo, setRolNuevo]                 = useState("");
   const [datosRol, setDatosRol]                 = useState({});
@@ -175,26 +174,18 @@ function GestionRoles() {
   const [loadingGestion, setLoadingGestion]     = useState(false);
   const [msgGestion, setMsgGestion]             = useState({ tipo: "", texto: "" });
 
-  /* Carga inicial */
-  useEffect(() => {
-    cargarUsuarios();
+  const elegirUsuario = useCallback((u) => {
+    setSeleccionado(u);
+    setBusqueda("");
+    setRolNuevo("");
+    setDatosRol({});
+    setErrores({});
+    setMsgExito("");
+    setMsgError("");
+    setMsgGestion({ tipo: "", texto: "" });
   }, []);
 
-  /* Filtro de búsqueda */
-  useEffect(() => {
-    if (!busqueda.trim()) { setResultados([]); return; }
-    const texto = normalizarTexto(busqueda);
-    setResultados(
-      usuarios
-        .filter(u =>
-          normalizarTexto(u.Usuario_Nombre_Completo || "").includes(texto) ||
-          normalizarTexto(u.Usuario_RUT || "").includes(texto)
-        )
-        .slice(0, 8)
-    );
-  }, [busqueda, usuarios]);
-
-  const cargarUsuarios = async () => {
+  const cargarUsuarios = useCallback(async () => {
     try {
       const res = await apiFetch("/api/usuarios");
       if (!res) return;
@@ -203,7 +194,7 @@ function GestionRoles() {
       setUsuarios(lista);
       // Si venimos desde un formulario de registro con id en la URL, preseleccionar
       if (idParam) {
-        const u = lista.find(u => u.Usuario_Id === Number(idParam));
+        const u = lista.find(usr => usr.Usuario_Id === Number(idParam));
         if (u) elegirUsuario(u);
       }
     } catch (e) {
@@ -211,19 +202,24 @@ function GestionRoles() {
     } finally {
       setLoadingPage(false);
     }
-  };
+  }, [idParam, elegirUsuario]);
 
-  const elegirUsuario = (u) => {
-    setSeleccionado(u);
-    setBusqueda("");
-    setResultados([]);
-    setRolNuevo("");
-    setDatosRol({});
-    setErrores({});
-    setMsgExito("");
-    setMsgError("");
-    setMsgGestion({ tipo: "", texto: "" });
-  };
+  /* Carga inicial */
+  useEffect(() => {
+    Promise.resolve().then(() => cargarUsuarios());
+  }, [cargarUsuarios]);
+
+  /* Filtro de búsqueda */
+  const resultados = useMemo(() => {
+    if (!busqueda.trim()) return [];
+    const texto = normalizarTexto(busqueda);
+    return usuarios
+      .filter(u =>
+        normalizarTexto(u.Usuario_Nombre_Completo || "").includes(texto) ||
+        normalizarTexto(u.Usuario_RUT || "").includes(texto)
+      )
+      .slice(0, 8);
+  }, [busqueda, usuarios]);
 
   const refreshSeleccionado = async () => {
     try {

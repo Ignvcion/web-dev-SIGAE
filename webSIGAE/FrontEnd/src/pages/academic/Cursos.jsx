@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
 import { getEstadoPeriodo } from "../../services/promocion";
@@ -149,7 +149,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
   const [exito, setExito] = useState("");
   const [mostrarModal, setMostrarModal] = useState(false);
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setCargando(true);
     try {
       const res = await fetch(`/api/cursos/${curso.Curso_Id}/asignaturas`, {
@@ -163,11 +163,11 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
     } finally {
       setCargando(false);
     }
-  };
+  }, [curso.Curso_Id, token]);
 
   useEffect(() => {
-    cargar();
-  }, [curso.Curso_Id]);
+    Promise.resolve().then(() => cargar());
+  }, [cargar]);
 
   const handleExito = (msg) => {
     setExito(msg);
@@ -205,7 +205,8 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
           <p>Este curso no tiene asignaturas asociadas aún.</p>
         </div>
       ) : (
-        <table className="tabla-asignaturas">
+        <div className="tabla-responsive-container">
+          <table className="tabla-asignaturas">
           <thead>
             <tr>
               <th>Asignatura</th>
@@ -227,6 +228,7 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, onVolver, onCambioJefatu
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {mostrarModal && (
@@ -260,7 +262,7 @@ function Cursos() {
 
   const token = localStorage.getItem("token");
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     try {
       const [resCursos, resNiveles] = await Promise.all([
         fetch("/api/cursos", { headers: { Authorization: `Bearer ${token}` } }),
@@ -276,11 +278,11 @@ function Cursos() {
     } finally {
       setCargando(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    Promise.resolve().then(() => cargarDatos());
+  }, [cargarDatos]);
 
   // Durante el cierre se pueden crear cursos del período siguiente
   useEffect(() => {

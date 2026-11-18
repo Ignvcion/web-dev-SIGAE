@@ -5,11 +5,16 @@ export const AuthContext = createContext();
 // Inicialización lazy — lee localStorage una sola vez al montar, sin useEffect
 function getInitialState() {
   try {
-    return {
-      usuario: JSON.parse(localStorage.getItem("usuario")) || null,
-      token: localStorage.getItem("token") || null,
-      rolActivo: localStorage.getItem("rolActivo") || null,
-    };
+    const usuario = JSON.parse(localStorage.getItem("usuario")) || null;
+    const token = localStorage.getItem("token") || null;
+    let rolActivo = localStorage.getItem("rolActivo") || null;
+    // Si rolActivo no pertenece a los roles del usuario autenticado, sincronizar
+    if (usuario?.roles && rolActivo && !usuario.roles.includes(rolActivo)) {
+      rolActivo = usuario.roles[0] || null;
+      if (rolActivo) localStorage.setItem("rolActivo", rolActivo);
+      else localStorage.removeItem("rolActivo");
+    }
+    return { usuario, token, rolActivo };
   } catch {
     return { usuario: null, token: null, rolActivo: null };
   }
@@ -29,7 +34,7 @@ function redirectToSessionExpired() {
   localStorage.removeItem("usuario");
   localStorage.removeItem("token");
   localStorage.removeItem("rolActivo");
-  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+  const basePath = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
   window.location.href = `${basePath}session-expired`;
 }
 
@@ -67,7 +72,16 @@ export function AuthProvider({ children }) {
     setToken(tokenData);
     localStorage.setItem("usuario", JSON.stringify(usuarioData));
     localStorage.setItem("token", tokenData);
-    return usuarioData.roles;
+
+    const roles = usuarioData?.roles || [];
+    const rolActual = roles.length === 1 ? roles[0] : (roles.includes(rolActivo) ? rolActivo : roles[0] || null);
+    setRolActivo(rolActual);
+    if (rolActual) {
+      localStorage.setItem("rolActivo", rolActual);
+    } else {
+      localStorage.removeItem("rolActivo");
+    }
+    return roles;
   };
 
   const seleccionarRol = (rol) => {

@@ -19,10 +19,6 @@ function Usuarios() {
   // { usuario, conEleccion: bool, accion: 'cuenta'|'rol', rolAQuitar: string|null, rolesActivos: string[] }
   const [loadingToggle, setLoadingToggle] = useState(false);
 
-  useEffect(() => {
-    cargarUsuarios("Todos", "Todos");
-  }, []);
-
   // CU29: listado con filtros avanzados por rol y estado de cuenta, resueltos en el backend
   const cargarUsuarios = async (rol, estado) => {
     setLoading(true);
@@ -47,6 +43,10 @@ function Usuarios() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => cargarUsuarios("Todos", "Todos"));
+  }, []);
 
   const aplicarFiltros = () => cargarUsuarios(filtroRol, filtroEstado);
 
@@ -76,10 +76,10 @@ const cambiarEstadoCuenta = async (u) => {
   try {
     const res = await apiFetch(`/api/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
     if (!res) return;
-    const data = await res.json().catch(() => ({}));
+    await res.json().catch(() => ({}));
     setUsuarios((prev) =>
       prev.map((usr) =>
-        usr.Usuario_Id === u.Usuario_Id
+        Number(usr.Usuario_Id) === Number(u.Usuario_Id)
           ? { ...usr, Usuario_Estado_Cuenta: usr.Usuario_Estado_Cuenta ? 0 : 1 }
           : usr
       )
@@ -217,11 +217,11 @@ const cambiarEstadoCuenta = async (u) => {
           </thead>
           <tbody>
             {usuariosFiltrados.map((u, idx) => {
-              const esMismoUsuario = u.Usuario_Id === usuario?.id;
+              const esMismoUsuario = Number(u.Usuario_Id) === Number(usuario?.id);
               const esSuperAdminFila = u.Administrador_Tipo === "Super Admin";
 
               return (
-                <tr key={u.Usuario_Id}>
+                <tr key={u.Usuario_Id || u.Usuario_RUT || idx}>
                   <td>{idx + 1}</td>
                   <td>{u.Usuario_Nombre_Completo}</td>
                   <td>{u.Usuario_RUT}</td>

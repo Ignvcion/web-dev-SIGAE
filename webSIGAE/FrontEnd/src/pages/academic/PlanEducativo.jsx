@@ -9,34 +9,36 @@ function TablaAsignaturas({ asignaturas }) {
     return <p className="empty-state-text">Este plan no tiene asignaturas registradas.</p>;
   }
   return (
-    <table className="tabla-asignaturas">
-      <thead>
-        <tr>
-          <th>Asignatura</th>
-          <th>Prioridad</th>
-          <th>Tipo</th>
-          <th>Horas / sem</th>
-        </tr>
-      </thead>
-      <tbody>
-        {asignaturas.map((a) => {
-          const tipo = a.Tipo || a.tipo || a.Plan_Asignatura_Tipo || "Obligatorio";
-          const horas = a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.Plan_Asignatura_Horas_Semanales ?? a.horas ?? 0;
-          return (
-            <tr key={a.IncluyeAsig_Id || a.Asignatura_Id}>
-              <td>{a.Asignatura_Nombre}</td>
-              <td>{a.Asignatura_Prioridad_Academica || "Media"}</td>
-              <td>
-                <span className={`badge-estado ${tipo === "Obligatorio" ? "badge-vigente" : "badge-inactiva"}`}>
-                  {tipo}
-                </span>
-              </td>
-              <td>{horas}h</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="tabla-responsive-container">
+      <table className="tabla-asignaturas">
+        <thead>
+          <tr>
+            <th>Asignatura</th>
+            <th>Prioridad</th>
+            <th>Tipo</th>
+            <th>Horas / sem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {asignaturas.map((a) => {
+            const tipo = a.Tipo || a.tipo || a.Plan_Asignatura_Tipo || "Obligatorio";
+            const horas = a.Horas_Semanales_Requeridas ?? a.horas_semanales ?? a.Plan_Asignatura_Horas_Semanales ?? a.horas ?? 0;
+            return (
+              <tr key={a.IncluyeAsig_Id || a.Asignatura_Id}>
+                <td>{a.Asignatura_Nombre}</td>
+                <td>{a.Asignatura_Prioridad_Academica || "Media"}</td>
+                <td>
+                  <span className={`badge-estado ${tipo === "Obligatorio" ? "badge-vigente" : "badge-inactiva"}`}>
+                    {tipo}
+                  </span>
+                </td>
+                <td>{horas}h</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -236,7 +238,7 @@ function FormCrearPlan({ onExito, onCancelar, periodoPropuesto }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Nuevo Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -399,7 +401,7 @@ function FormEditarPlan({ planId, onExito, onCancelar }) {
     <form onSubmit={handleSubmit} className="form-card">
       <h2>Editar Plan Educativo</h2>
       {error && <p className="msg-error">{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem" }}>
         <div>
           <label>Periodo Lectivo</label>
           <input
@@ -483,7 +485,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
   }, []);
 
   useEffect(() => {
-    if (!planOrigenId) { setAsignaturas([]); return; }
+    if (!planOrigenId) { Promise.resolve().then(() => setAsignaturas([])); return; }
     const precargar = async () => {
       setCargandoAsig(true);
       try {
@@ -579,7 +581,7 @@ function FormClonarPlan({ planesExistentes, onExito, onCancelar }) {
         ))}
       </select>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: "1rem", marginTop: "1rem" }}>
         <div>
           <label>Nuevo Periodo Lectivo</label>
           <input
@@ -665,7 +667,7 @@ function PlanEducativo() {
     }
   }, []);
 
-  useEffect(() => { cargarPlanes(); }, [cargarPlanes]);
+  useEffect(() => { Promise.resolve().then(() => cargarPlanes()); }, [cargarPlanes]);
 
   const handleExito = (msg) => {
     setExito(msg);

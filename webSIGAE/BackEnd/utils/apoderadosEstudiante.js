@@ -63,7 +63,7 @@ async function obtenerApoderadosEstudiante(conn, estudianteId) {
        FROM apoderado_suplente s
        JOIN usuario u ON u.Usuario_Id = s.Suplente_Usuario_Id
       WHERE s.Estudiante_Id = ?
-      ORDER BY s.Apoderado_Suplente_Id`,
+      ORDER BY s.Suplente_Usuario_Id`,
     [estudianteId]
   );
   return { estudiante, titular, suplentes };

@@ -487,6 +487,15 @@ export async function confirmarCitacion(citacionId) {
   return handleResponse(res);
 }
 
+// RF54 / CU86: el docente habilita que el apoderado le responda hasta el término de la reunión
+export async function habilitarRespuestasCitacion(citacionId) {
+  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/habilitar-respuestas`, {
+    method : 'PATCH',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 // CU76: cancelar citación con motivo obligatorio (queda registrado en el historial)
 export async function cancelarCitacion(citacionId, motivo) {
   const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/cancelar`, {

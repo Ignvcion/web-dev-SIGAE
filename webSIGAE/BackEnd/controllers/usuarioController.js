@@ -745,8 +745,12 @@ const buscarUsuario = async (req, res) => {
   const { rut, nombre, correo } = req.body;
   const solicitante = req.user;
 
+  const rutLimpio = typeof rut === 'string' ? rut.trim() : '';
+  const nomLimpio = typeof nombre === 'string' ? nombre.trim() : '';
+  const corLimpio = typeof correo === 'string' ? correo.trim() : '';
+
   // CU28 - Excepción "Campos inválidos o incompletos"
-  if (!rut && !nombre && !correo) {
+  if (!rutLimpio && !nomLimpio && !corLimpio) {
     return res.status(400).json({ mensaje: 'Ingrese datos válidos' });
   }
 
@@ -754,19 +758,19 @@ const buscarUsuario = async (req, res) => {
     const conditions = [];
     const params     = [];
 
-    if (rut) {
+    if (rutLimpio) {
       conditions.push('Usuario_RUT LIKE ?');
-      params.push(`%${rut}%`);
+      params.push(`%${rutLimpio}%`);
     }
-    if (nombre) {
+    if (nomLimpio) {
       conditions.push('Usuario_Nombre_Completo LIKE ?');
-      params.push(`%${nombre}%`);
+      params.push(`%${nomLimpio}%`);
     }
-    if (correo) {
+    if (corLimpio) {
       conditions.push(
         '(Administrador_Correo_Institucional LIKE ? OR Docente_Correo_Institucional LIKE ? OR Apoderado_Correo_Natural LIKE ?)'
       );
-      params.push(`%${correo}%`, `%${correo}%`, `%${correo}%`);
+      params.push(`%${corLimpio}%`, `%${corLimpio}%`, `%${corLimpio}%`);
     }
 
     const [rows] = await db.query(
@@ -775,7 +779,7 @@ const buscarUsuario = async (req, res) => {
               Es_Docente, Docente_Correo_Institucional, Docente_Especialidad,
               Es_Apoderado, Apoderado_Correo_Natural
        FROM usuario
-       WHERE ${conditions.join(' OR ')}
+       WHERE ${conditions.join(' AND ')}
        ORDER BY Usuario_Nombre_Completo
        LIMIT 20`,
       params
@@ -831,8 +835,13 @@ const getDocentes = async (req, res) => {
     `;
     const params = [];
 
-    // Filtros opcionales (CU31)
-    if (especialidad && especialidad.trim() !== '') {
+    // Filtros opcionales (CU31: nombre, RUT o especialidad)
+    const criterioBusqueda = req.query.criterio || req.query.q;
+    if (criterioBusqueda && criterioBusqueda.trim() !== '') {
+      const term = `%${criterioBusqueda.trim()}%`;
+      sql += ' AND (Docente_Especialidad LIKE ? OR Usuario_Nombre_Completo LIKE ? OR Usuario_RUT LIKE ?)';
+      params.push(term, term, term);
+    } else if (especialidad && especialidad.trim() !== '') {
       sql += ' AND Docente_Especialidad LIKE ?';
       params.push(`%${especialidad.trim()}%`);
     }

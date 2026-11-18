@@ -9,6 +9,26 @@ import {
   eliminarTodasAsociaciones,
 } from "../../services/api";
 
+const deduplicarEstudiantesSinApo = (lista) => {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
+  let maxId = 1000;
+  for (const e of lista) {
+    const idNum = Number(e?.Estudiante_Id);
+    if (!isNaN(idNum) && idNum > maxId) maxId = idNum;
+  }
+  return lista.map((e) => {
+    const idNum = Number(e?.Estudiante_Id);
+    if (!idNum || isNaN(idNum) || vistos.has(idNum)) {
+      maxId += 1;
+      vistos.add(maxId);
+      return { ...e, Estudiante_Id: maxId };
+    }
+    vistos.add(idNum);
+    return { ...e, Estudiante_Id: idNum };
+  });
+};
+
 function Apoderados() {
   const { usuario } = useAuth();
   const esAdmin =
@@ -44,10 +64,6 @@ function Apoderados() {
   const [loadingEliminarTodas, setLoadingEliminarTodas]      = useState(false);
   const [avisoEliminarTodas, setAvisoEliminarTodas]          = useState(null);
 
-  useEffect(() => {
-    cargarApoderados({});
-  }, []);
-
   const cargarApoderados = async (filtros) => {
     setLoading(true);
     setErrorCarga("");
@@ -68,6 +84,10 @@ function Apoderados() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => cargarApoderados({}));
+  }, []);
 
   // Obtener los estudiantes ya asociados a un apoderado
   const cargarEstudiantesDelApoderado = async (apoderadoId) => {
@@ -96,9 +116,9 @@ function Apoderados() {
         getEstudiantesSinApoderado(),
         cargarEstudiantesDelApoderado(apoderado.Usuario_Id),
       ]);
-      setEstudiantesSinApo(sinApo);
+      setEstudiantesSinApo(deduplicarEstudiantesSinApo(sinApo));
       setEstudiantesDelApo(delApo);
-    } catch (error) {
+    } catch {
       setErrorModal("Error al cargar estudiantes");
     } finally {
       setLoadingModal(false);
@@ -116,6 +136,7 @@ function Apoderados() {
   };
 
   const toggleSeleccion = (id) => {
+    if (id === undefined || id === null) return;
     setSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -139,7 +160,7 @@ function Apoderados() {
         getEstudiantesSinApoderado(),
         cargarEstudiantesDelApoderado(apoderadoSeleccionado.Usuario_Id),
       ]);
-      setEstudiantesSinApo(sinApo);
+      setEstudiantesSinApo(deduplicarEstudiantesSinApo(sinApo));
       setEstudiantesDelApo(delApo);
       setSeleccionados([]);
     } catch (error) {
@@ -155,7 +176,7 @@ function Apoderados() {
       getEstudiantesSinApoderado(),
       cargarEstudiantesDelApoderado(apoderadoSeleccionado.Usuario_Id),
     ]);
-    setEstudiantesSinApo(sinApo);
+    setEstudiantesSinApo(deduplicarEstudiantesSinApo(sinApo));
     setEstudiantesDelApo(delApo);
   };
 
@@ -240,6 +261,7 @@ function Apoderados() {
   };
 
   const limpiarFiltroCantidad = () => {
+    setBusqueda("");
     setOperadorFiltro("=");
     setCantidadFiltro("");
     cargarApoderados({});
@@ -272,12 +294,21 @@ function Apoderados() {
       {/* Buscador */}
       <div className="usuarios-filtros">
         <input
-          type="text"
+          type="search"
           className="usuarios-search"
           placeholder="Buscar por nombre o RUT..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+        {busqueda && (
+          <button
+            type="button"
+            className="btn-roles"
+            onClick={() => setBusqueda("")}
+          >
+            Limpiar búsqueda
+          </button>
+        )}
       </div>
 
       {/* CU33: filtro por cantidad de estudiantes asociados */}
@@ -346,7 +377,7 @@ function Apoderados() {
           </thead>
           <tbody>
             {apoderadosFiltrados.map((u, idx) => (
-              <tr key={u.Usuario_Id}>
+              <tr key={`${u.Usuario_Id || "apo"}-${u.Usuario_RUT || idx}-${idx}`}>
                 <td>{idx + 1}</td>
                 <td>{u.Usuario_Nombre_Completo}</td>
                 <td>{u.Usuario_RUT}</td>
@@ -533,11 +564,11 @@ function Apoderados() {
                     </p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "220px", overflowY: "auto" }}>
-                      {estudiantesSinApo.map((e) => {
+                      {estudiantesSinApo.map((e, idx) => {
                         const marcado = seleccionados.includes(e.Estudiante_Id);
                         return (
                           <div
-                            key={e.Estudiante_Id}
+                            key={`sin-apo-${e.Estudiante_Id ?? "noid"}-${e.Estudiante_RUT || idx}`}
                             onClick={() => toggleSeleccion(e.Estudiante_Id)}
                             style={{
                               background    : marcado ? "#eff6ff" : "#f8fafc",

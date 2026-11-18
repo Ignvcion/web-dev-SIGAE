@@ -4,6 +4,7 @@ import {
   MAX_MOTIVO,
   MODALIDADES,
   TRAMOS_HORARIOS,
+  esTramoPasadoHoy,
   hoyISO,
   validarDatosCitacion,
 } from "../../utils/citaciones";
@@ -23,7 +24,13 @@ function FormCitacionModal({ estudiantes, mensajeSinEstudiantes, onClose, onCrea
   const citables = (estudiantes || []).filter((e) => e.Apoderado_Usuario_Id || e.Apoderado_Nombre || e.Estudiante_Id);
 
   const actualizar = (campo, valor) => {
-    setForm((f) => ({ ...f, [campo]: valor }));
+    setForm((f) => {
+      const siguiente = { ...f, [campo]: valor };
+      if (campo === "fecha" && f.tramo && esTramoPasadoHoy(valor, f.tramo)) {
+        siguiente.tramo = "";
+      }
+      return siguiente;
+    });
     setErrores((e) => ({ ...e, [campo]: undefined }));
     setMsgError("");
   };
@@ -122,9 +129,14 @@ function FormCitacionModal({ estudiantes, mensajeSinEstudiantes, onClose, onCrea
                   onChange={(e) => actualizar("tramo", e.target.value)}
                 >
                   <option value="">Selecciona un tramo...</option>
-                  {TRAMOS_HORARIOS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+                  {TRAMOS_HORARIOS.map((t) => {
+                    const pasado = esTramoPasadoHoy(form.fecha, t);
+                    return (
+                      <option key={t} value={t} disabled={pasado}>
+                        {pasado ? `${t} (pasado)` : t}
+                      </option>
+                    );
+                  })}
                 </select>
                 {errores.tramo && <span className="pwd-error">{errores.tramo}</span>}
               </div>

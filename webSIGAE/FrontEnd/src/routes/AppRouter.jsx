@@ -2,6 +2,7 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  Navigate,
 } from "react-router-dom";
 
 /* AUTH */
@@ -33,9 +34,6 @@ import Administradores from "../pages/users/Administradores";
 import Docentes from "../pages/users/Docentes";
 import BuscarUsuarios from "../pages/users/BuscarUsuarios";
 import Perfil from "../pages/users/Perfil";
-
-/* NUEVOS COMPONENTES */
-import ListaEstudiantesApoderado from "../components/ListaEstudiantesApoderado";
 
 /* ACADEMIC */
 
@@ -383,6 +381,8 @@ function AppRouter() {
           />
 
         </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registrarApoderado } from "../../services/api";
 import {
-  validarRut, obtenerErrorRut, normalizarRut, validarNombreCompleto, validarCorreo, validarTelefonoChileno,
+  obtenerErrorRut, normalizarRut, validarNombreCompleto, validarCorreo, validarTelefonoChileno,
   validarFortalezaContrasena, validarDireccion, MENSAJE_TELEFONO, MAX_NOMBRE_COMPLETO,
 } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";

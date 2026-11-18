@@ -10,7 +10,7 @@ function hhmm(t) {
 // (incluye las suspensiones por eventos institucionales, RF42/RF45).
 function DetalleBloqueModal({ horarioId, onClose }) {
   const [rawDetalle, setDetalle] = useState(null);
-  const detalle = Array.isArray(rawDetalle) ? (rawDetalle[0] || {}) : rawDetalle;
+  const detalle = Array.isArray(rawDetalle) ? (rawDetalle[0] || null) : rawDetalle;
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
 
@@ -75,7 +75,7 @@ function DetalleBloqueModal({ horarioId, onClose }) {
             <dd>
               {Array.isArray(detalle.observaciones) && detalle.observaciones.length > 0 ? (
                 <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                  {detalle.observaciones.map((obs) => <li key={obs}>{obs}</li>)}
+                  {detalle.observaciones.map((obs, idx) => <li key={`${obs}-${idx}`}>{obs}</li>)}
                 </ul>
               ) : (
                 "Sin observaciones."

@@ -1,355 +1,524 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import {
+  getApoderados,
+  getCitaciones,
+  getCursos,
+  getDocentes,
+  getEstudiantes,
+  getHorarioMaestro,
+} from "../../services/api";
+import { getEstadoPeriodo } from "../../services/promocion";
+import {
+  construirContextoReportes,
+  construirReportes,
+  extraerLista,
+  filtrarCursosPorPeriodo,
+  generarContenidoExcel,
+  generarReportePdfBytes,
+  nombreArchivoReporte,
+  obtenerPeriodosDisponibles,
+} from "../../utils/reportes";
 
 function triggerDownloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function generarReporteExcel(reporteId, titulo, periodo) {
-  const content = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"/></head>
-<body>
-<table border="1">
-  <tr><th colspan="5" style="background:#1e3a5f;color:#ffffff;font-size:16px;height:35px;">COLEGIO JACQUES COUSTEAU - ${titulo.toUpperCase()}</th></tr>
-  <tr><th colspan="5" style="background:#f8fafc;font-size:12px;color:#64748b;">Periodo Académico: ${periodo} · Fecha: ${new Date().toLocaleDateString('es-CL')}</th></tr>
-  <tr style="background:#f1f5f9;font-weight:bold;">
-    <th>#</th>
-    <th>Estudiante / Detalle</th>
-    <th>Curso</th>
-    <th>Indicador / Registro</th>
-    <th>Estado</th>
-  </tr>
-  <tr><td>1</td><td>Lucas Mateo Fernandez Vera</td><td>1° Básico A</td><td>Asistencia 98% (Excelente)</td><td>Regular</td></tr>
-  <tr><td>2</td><td>Sofia Valentina Gonzalez Morales</td><td>2° Básico A</td><td>Asistencia 96% (Excelente)</td><td>Regular</td></tr>
-  <tr><td>3</td><td>Martín Ignacio Silva Torres</td><td>1° Básico A</td><td>Asistencia 92% (Normal)</td><td>Regular</td></tr>
-  <tr><td>4</td><td>Esperanza Penelope Gonzales Farias</td><td>1° Básico A</td><td>Asistencia 95% (Normal)</td><td>Regular</td></tr>
-  <tr><td>5</td><td>Carlos Gonzales Farias</td><td>2° Básico A</td><td>Asistencia 97% (Excelente)</td><td>Regular</td></tr>
-</table>
-</body>
-</html>`;
-  const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8" });
-  triggerDownloadBlob(blob, `${reporteId}_${periodo}.xls`);
-}
-
-function generarReportePdf(reporteId, titulo, periodo) {
-  const lines = [
-    `Reporte Oficial: ${titulo}`,
-    `Periodo Academico: ${periodo}`,
-    `Fecha de emision: ${new Date().toLocaleDateString('es-CL')}`,
-    "------------------------------------------------------------------------------------",
-    "1. Lucas Mateo Fernandez Vera     (1 Basico A)   - Registro Conforme (98%)",
-    "2. Sofia Valentina Gonzalez Morales (2 Basico A) - Registro Conforme (96%)",
-    "3. Martin Ignacio Silva Torres     (1 Basico A)   - Registro Conforme (92%)",
-    "4. Esperanza Penelope Gonzales     (1 Basico A)   - Registro Conforme (95%)",
-    "5. Carlos Gonzales Farias          (2 Basico A)   - Registro Conforme (97%)",
-    "------------------------------------------------------------------------------------",
-    "Total evaluados: 5 estudiantes. Metricas generales dentro del rango institucional.",
-  ];
-
-  const content = [
-    'BT',
-    '/F1 15 Tf',
-    '50 780 Td',
-    '(' + titulo.replace(/[()\\\\]/g, '') + ') Tj',
-    '/F1 10 Tf',
-    '0 -22 Td',
-    '(Colegio Jacques Cousteau - Sistema de Gestion Academica Escolar) Tj',
-    '0 -16 Td',
-    '(Periodo ' + periodo + ' - Emision oficial: ' + new Date().toLocaleDateString('es-CL') + ') Tj',
-    '0 -20 Td',
-    '(------------------------------------------------------------------------------------) Tj',
-  ];
-  lines.slice(3).forEach((line) => {
-    content.push('0 -18 Td');
-    content.push('(' + line.replace(/[()\\\\]/g, '') + ') Tj');
-  });
-  content.push('0 -30 Td');
-  content.push('(Documento institucional verificado por SIGAE - Valido para fines oficiales) Tj');
-  content.push('ET');
-  const stream = content.join('\n');
-
-  const objects = [];
-  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
-  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj');
-  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj');
-  objects.push('4 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
-  objects.push('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj');
-
-  let pdf = '%PDF-1.4\n';
-  const xref = [0];
-  objects.forEach((obj) => {
-    xref.push(pdf.length);
-    pdf += obj + '\n';
-  });
-  const xrefStart = pdf.length;
-  pdf += 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n';
-  xref.slice(1).forEach((pos) => {
-    pdf += String(pos).padStart(10, '0') + ' 00000 n \n';
-  });
-  pdf += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF\n';
-  const bytes = new TextEncoder().encode(pdf);
-  const blob = new Blob([bytes], { type: "application/pdf" });
-  triggerDownloadBlob(blob, `${reporteId}_${periodo}.pdf`);
+  a.remove();
+  // Retrasa la revocación para navegadores móviles y PWA instaladas
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 function Reportes() {
-  const [periodo, setPeriodo] = useState("2026");
-  const [curso, setCurso] = useState("todos");
-  const [descargando, setDescargando] = useState("");
-  const [mensaje, setMensaje] = useState("");
+  const { usuario, rolActivo } = useAuth();
+  const rol = rolActivo || usuario?.roles?.[0] || "Administrador";
 
-  const handleDescargar = (reporteId, nombreReporte, formato) => {
-    const key = `${reporteId}-${formato}`;
-    setDescargando(key);
-    setMensaje("");
-    setTimeout(() => {
-      try {
-        if (formato === "pdf") {
-          generarReportePdf(reporteId, nombreReporte, periodo);
-        } else {
-          generarReporteExcel(reporteId, nombreReporte, periodo);
-        }
-        setMensaje(`✅ ${nombreReporte} descargado exitosamente en formato ${formato.toUpperCase()}.`);
-      } catch {
-        setMensaje(`Error al generar ${nombreReporte}.`);
-      } finally {
-        setDescargando("");
-        setTimeout(() => setMensaje(""), 4000);
+  const [fuentes, setFuentes] = useState({
+    cursos: [],
+    estudiantes: [],
+    docentes: [],
+    apoderados: [],
+    citaciones: [],
+    horarios: [],
+    estadoPeriodo: null,
+  });
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState("");
+  const [avisoParcial, setAvisoParcial] = useState("");
+  const [recargaKey, setRecargaKey] = useState(0);
+
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState(null);
+  const [cursoSeleccionadoId, setCursoSeleccionadoId] = useState("todos");
+  const [descargando, setDescargando] = useState("");
+  const [mensaje, setMensaje] = useState({ tipo: "", texto: "" });
+  const [vistaPreviaId, setVistaPreviaId] = useState(null);
+
+  const timerMensajeRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerMensajeRef.current) clearTimeout(timerMensajeRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+    Promise.allSettled([
+      getCursos(),
+      getEstudiantes(),
+      getDocentes(),
+      getApoderados(),
+      getCitaciones(rol),
+      getHorarioMaestro(),
+      getEstadoPeriodo(),
+    ]).then(([resCursos, resEst, resDoc, resApo, resCit, resHor, resPer]) => {
+      if (!activo) return;
+
+      const falloCursos = resCursos.status === "rejected";
+      const falloEst = resEst.status === "rejected";
+      if (falloCursos && falloEst) {
+        setErrorCarga(
+          resCursos.reason?.message ||
+          resEst.reason?.message ||
+          "No fue posible cargar los cursos y datos académicos del establecimiento."
+        );
+        setCargando(false);
+        return;
       }
-    }, 300);
+
+      const faltantes = [];
+      if (falloCursos) faltantes.push("cursos");
+      if (falloEst) faltantes.push("estudiantes");
+      if (resDoc.status === "rejected") faltantes.push("docentes");
+      if (resApo.status === "rejected") faltantes.push("apoderados");
+      if (resCit.status === "rejected") faltantes.push("citaciones");
+      // Horario Maestro devuelve 404 cuando aún no hay clases asignadas; solo avisar en errores reales de red/servidor
+      if (
+        resHor.status === "rejected" &&
+        resHor.reason?.message &&
+        !String(resHor.reason.message).toLowerCase().includes("no es posible generar el horario maestro")
+      ) {
+        faltantes.push("horarios");
+      }
+
+      setErrorCarga("");
+      setAvisoParcial(
+        faltantes.length > 0
+          ? `Algunos módulos no pudieron actualizarse (${faltantes.join(", ")}). Se muestran los datos disponibles.`
+          : ""
+      );
+      setFuentes({
+        cursos: resCursos.status === "fulfilled" ? extraerLista(resCursos.value, "cursos") : [],
+        estudiantes: resEst.status === "fulfilled" ? extraerLista(resEst.value, "estudiantes") : [],
+        docentes: resDoc.status === "fulfilled" ? extraerLista(resDoc.value, "docentes") : [],
+        apoderados: resApo.status === "fulfilled" ? extraerLista(resApo.value, "apoderados") : [],
+        citaciones: resCit.status === "fulfilled" ? extraerLista(resCit.value, "citaciones") : [],
+        horarios: resHor.status === "fulfilled" ? extraerLista(resHor.value, "horarios") : [],
+        estadoPeriodo: resPer.status === "fulfilled" ? resPer.value : null,
+      });
+      setCargando(false);
+    });
+
+    return () => {
+      activo = false;
+    };
+  }, [rol, recargaKey]);
+
+  const { periodos, periodoDefecto } = useMemo(
+    () => obtenerPeriodosDisponibles(fuentes.cursos, fuentes.estadoPeriodo),
+    [fuentes.cursos, fuentes.estadoPeriodo]
+  );
+
+  const periodoEfectivo = useMemo(() => {
+    if (periodoSeleccionado === "todos") return "todos";
+    if (periodoSeleccionado && periodos.includes(periodoSeleccionado)) return periodoSeleccionado;
+    return periodoDefecto;
+  }, [periodoSeleccionado, periodos, periodoDefecto]);
+
+  const cursosDelPeriodo = useMemo(
+    () => filtrarCursosPorPeriodo(fuentes.cursos, periodoEfectivo),
+    [fuentes.cursos, periodoEfectivo]
+  );
+
+  const cursoEfectivo = useMemo(() => {
+    if (cursoSeleccionadoId === "todos") return "todos";
+    const existe = cursosDelPeriodo.some((c) => String(c.Curso_Id) === String(cursoSeleccionadoId));
+    return existe ? String(cursoSeleccionadoId) : "todos";
+  }, [cursoSeleccionadoId, cursosDelPeriodo]);
+
+  const contexto = useMemo(
+    () =>
+      construirContextoReportes({
+        ...fuentes,
+        periodo: periodoEfectivo,
+        cursoId: cursoEfectivo,
+      }),
+    [fuentes, periodoEfectivo, cursoEfectivo]
+  );
+
+  const reportes = useMemo(() => construirReportes(contexto), [contexto]);
+
+  const periodoLabel = periodoEfectivo === "todos" ? "Todos los períodos" : `Período ${periodoEfectivo}`;
+  const cursoLabel = contexto.cursoSeleccionado
+    ? contexto.cursoSeleccionado.Curso_Nombre
+    : "Todos los cursos";
+
+  const vistaPreviaReporte = useMemo(
+    () => (vistaPreviaId ? reportes.find((r) => r.id === vistaPreviaId) || null : null),
+    [reportes, vistaPreviaId]
+  );
+
+  const mostrarMensaje = (tipo, texto) => {
+    if (timerMensajeRef.current) clearTimeout(timerMensajeRef.current);
+    setMensaje({ tipo, texto });
+    timerMensajeRef.current = setTimeout(() => setMensaje({ tipo: "", texto: "" }), 4500);
   };
 
-  const REPORTES_DISPONIBLES = [
-    {
-      id: "asistencia",
-      titulo: "Reporte de Asistencia Mensual",
-      descripcion: "Detalle de inasistencias justificadas, atrasos y porcentaje de asistencia por curso.",
-      icono: "📊",
-      etiqueta: "Mensual",
-    },
-    {
-      id: "calificaciones",
-      titulo: "Boletín de Calificaciones",
-      descripcion: "Notas parciales, promedios semestrales y asignaturas bajo promedio por nivel.",
-      icono: "📝",
-      etiqueta: "Semestral",
-    },
-    {
-      id: "matricula",
-      titulo: "Nómina Oficial de Matrícula",
-      descripcion: "Listado oficial de estudiantes activos, RUT, fecha de matrícula y apoderados.",
-      icono: "📋",
-      etiqueta: "Oficial",
-    },
-    {
-      id: "citaciones",
-      titulo: "Historial de Citaciones a Apoderados",
-      descripcion: "Consolidado de citaciones programadas, asistencias y compromisos adquiridos.",
-      icono: "🤝",
-      etiqueta: "Convivencia",
-    },
-    {
-      id: "carga-docente",
-      titulo: "Distribución de Carga Horaria",
-      descripcion: "Horas pedagógicas y de planificación asignadas a cada docente por período.",
-      icono: "🕐",
-      etiqueta: "Docencia",
-    },
-    {
-      id: "promocion",
-      titulo: "Situación Final y Promoción",
-      descripcion: "Alumnos promovidos, en riesgo de repitencia y aprobaciones anuales.",
-      icono: "🎓",
-      etiqueta: "Anual",
-    },
-  ];
+  const handlePeriodoChange = (nuevoPeriodo) => {
+    setPeriodoSeleccionado(nuevoPeriodo);
+    const cursosCompatibles = filtrarCursosPorPeriodo(fuentes.cursos, nuevoPeriodo);
+    if (
+      cursoSeleccionadoId !== "todos" &&
+      !cursosCompatibles.some((c) => String(c.Curso_Id) === String(cursoSeleccionadoId))
+    ) {
+      setCursoSeleccionadoId("todos");
+    }
+  };
+
+  const limpiarFiltros = () => {
+    setPeriodoSeleccionado(periodoDefecto);
+    setCursoSeleccionadoId("todos");
+  };
+
+  const reintentarCarga = () => {
+    setCargando(true);
+    setErrorCarga("");
+    setRecargaKey((k) => k + 1);
+  };
+
+  const handleDescargar = (reporte, formato) => {
+    if (!reporte || reporte.totalRegistros === 0) {
+      mostrarMensaje("error", `${reporte?.titulo || "El reporte"} no tiene registros para el filtro actual.`);
+      return;
+    }
+
+    const key = `${reporte.id}-${formato}`;
+    setDescargando(key);
+    try {
+      const meta = { periodoLabel, cursoLabel };
+      if (formato === "pdf") {
+        const pdfBytes = generarReportePdfBytes(reporte, meta);
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        triggerDownloadBlob(blob, nombreArchivoReporte(reporte.id, periodoLabel, cursoLabel, "pdf"));
+      } else {
+        const htmlExcel = generarContenidoExcel(reporte, meta);
+        const blob = new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8" });
+        triggerDownloadBlob(blob, nombreArchivoReporte(reporte.id, periodoLabel, cursoLabel, "xls"));
+      }
+      mostrarMensaje(
+        "exito",
+        `${reporte.titulo} descargado (${reporte.totalRegistros} registro(s), ${cursoLabel}, ${periodoLabel}) en ${formato.toUpperCase()}.`
+      );
+    } catch (error) {
+      mostrarMensaje("error", error?.message || `No fue posible generar ${reporte.titulo}.`);
+    } finally {
+      setDescargando("");
+    }
+  };
+
+  const hayFiltroPersonalizado = periodoEfectivo !== periodoDefecto || cursoEfectivo !== "todos";
+  const { metricas } = contexto;
 
   return (
-    <div className="page-container" style={{ maxWidth: "1200px", margin: "0 auto", padding: "1rem" }}>
-      <div className="page-header">
+    <div className="usuarios-container">
+      <div className="rep-header">
         <div>
           <h1>Reportes Institucionales</h1>
-          <p>Consulta, exporta y descarga la información académica del establecimiento</p>
+          <p>Consulta, previsualiza y exporta información académica consolidada y filtrada por curso</p>
         </div>
+        <button
+          type="button"
+          className="btn-roles"
+          onClick={reintentarCarga}
+          disabled={cargando}
+        >
+          {cargando ? "Actualizando..." : "↻ Actualizar datos"}
+        </button>
       </div>
 
-      {mensaje && (
-        <div className="msg-exito" style={{ marginBottom: "1.5rem" }}>
-          {mensaje}
+      {mensaje.texto && (
+        <div
+          className={mensaje.tipo === "error" ? "msg-error-form" : "msg-exito"}
+          style={{ marginBottom: "1rem" }}
+          role="status"
+        >
+          {mensaje.texto}
         </div>
       )}
 
-      {/* Métricas rápidas */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: "12px",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>Asistencia General</span>
-          <p style={{ margin: "4px 0 0", fontSize: "1.4rem", fontWeight: 700, color: "#16a34a" }}>94.2%</p>
+      {avisoParcial && !errorCarga && (
+        <div className="error-message" style={{ marginBottom: "1rem" }}>
+          {avisoParcial}
         </div>
-        <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>Matrícula Activa</span>
-          <p style={{ margin: "4px 0 0", fontSize: "1.4rem", fontWeight: 700, color: "#2563eb" }}>348</p>
-        </div>
-        <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>Docentes Activos</span>
-          <p style={{ margin: "4px 0 0", fontSize: "1.4rem", fontWeight: 700, color: "#7c3aed" }}>28</p>
-        </div>
-        <div style={{ background: "#fff", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 600 }}>Citaciones Realizadas</span>
-          <p style={{ margin: "4px 0 0", fontSize: "1.4rem", fontWeight: 700, color: "#d97706" }}>86%</p>
-        </div>
-      </div>
+      )}
 
-      {/* Filtros */}
-      <div
-        className="usuarios-filtros"
-        style={{
-          background: "#fff",
-          padding: "16px",
-          borderRadius: "12px",
-          border: "1px solid #e2e8f0",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: "160px" }}>
-          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
-            Año Académico:
-          </label>
-          <select
-            className="usuarios-select"
-            value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <option value="2026">Período 2026</option>
-            <option value="2025">Período 2025</option>
-          </select>
+      {errorCarga ? (
+        <div className="usuarios-empty">
+          <div className="msg-error-form" style={{ marginBottom: "12px" }}>{errorCarga}</div>
+          <button type="button" className="btn-roles" onClick={reintentarCarga}>
+            Reintentar
+          </button>
         </div>
-
-        <div style={{ flex: 1, minWidth: "160px" }}>
-          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
-            Filtrar por Curso:
-          </label>
-          <select
-            className="usuarios-select"
-            value={curso}
-            onChange={(e) => setCurso(e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <option value="todos">Todos los cursos</option>
-            <option value="1">1° Básico A</option>
-            <option value="2">2° Básico A</option>
-            <option value="3">3° Básico A</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Listado de Reportes */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-          gap: "16px",
-        }}
-      >
-        {REPORTES_DISPONIBLES.map((r) => {
-          const descargandoPdf = descargando === `${r.id}-pdf`;
-          const descargandoExcel = descargando === `${r.id}-excel`;
-
-          return (
-            <div
-              key={r.id}
-              style={{
-                background: "#fff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                gap: "14px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "1.8rem" }}>{r.icono}</span>
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      background: "#e0e7ff",
-                      color: "#4338ca",
-                      padding: "2px 8px",
-                      borderRadius: "999px",
-                    }}
-                  >
-                    {r.etiqueta}
-                  </span>
-                </div>
-                <h3 style={{ margin: "0 0 6px", fontSize: "1.1rem", color: "#1e293b" }}>{r.titulo}</h3>
-                <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748b", lineHeight: 1.4 }}>{r.descripcion}</p>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", paddingTop: "10px", borderTop: "1px solid #f1f5f9" }}>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => handleDescargar(r.id, r.titulo, "pdf")}
-                  disabled={descargandoPdf}
-                  style={{
-                    flex: "1 1 120px",
-                    fontSize: "0.82rem",
-                    padding: "8px 12px",
-                    minHeight: "40px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    cursor: descargandoPdf ? "wait" : "pointer",
-                  }}
-                >
-                  {descargandoPdf ? "Generando..." : "📄 Descargar PDF"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-secundario"
-                  onClick={() => handleDescargar(r.id, r.titulo, "excel")}
-                  disabled={descargandoExcel}
-                  style={{
-                    flex: "1 1 120px",
-                    fontSize: "0.82rem",
-                    padding: "8px 12px",
-                    minHeight: "40px",
-                    border: "1px solid #d1d5db",
-                    background: "#f8fafc",
-                    borderRadius: "10px",
-                    cursor: descargandoExcel ? "wait" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                  }}
-                >
-                  {descargandoExcel ? "Generando..." : "📊 Descargar Excel"}
-                </button>
-              </div>
+      ) : cargando ? (
+        <p className="empty-state-text">Cargando cursos y datos institucionales...</p>
+      ) : (
+        <>
+          {/* KPIs reales calculados según el período y curso filtrados */}
+          <div className="rep-kpi-grid">
+            <div className="rep-kpi-card">
+              <span className="rep-kpi-label">
+                {contexto.cursoSeleccionado ? "Curso Seleccionado" : "Cursos"}
+              </span>
+              <p className="rep-kpi-valor rep-kpi-valor--green">{metricas.totalCursos}</p>
+              <span className="rep-kpi-sub">
+                {contexto.cursoSeleccionado
+                  ? `Jefe: ${contexto.cursoSeleccionado.Profesor_Jefe_Nombre || "Sin asignar"}`
+                  : `${metricas.jefaturasAsignadas} con profesor jefe`}
+              </span>
             </div>
-          );
-        })}
-      </div>
+
+            <div className="rep-kpi-card">
+              <span className="rep-kpi-label">Matrícula</span>
+              <p className="rep-kpi-valor rep-kpi-valor--blue">{metricas.totalEstudiantes}</p>
+              <span className="rep-kpi-sub">
+                {metricas.totalEstudiantes === 0
+                  ? "Sin estudiantes asignados"
+                  : `${metricas.estudiantesRegulares} regular(es) · ${metricas.conApoderado} con apoderado`}
+              </span>
+            </div>
+
+            <div className="rep-kpi-card">
+              <span className="rep-kpi-label">Docentes</span>
+              <p className="rep-kpi-valor rep-kpi-valor--purple">{metricas.totalDocentesFiltro}</p>
+              <span className="rep-kpi-sub">
+                {contexto.cursoSeleccionado
+                  ? `${metricas.bloquesActivos} bloque(s) en el curso`
+                  : `${metricas.docentesConCarga} con bloques asignados`}
+              </span>
+            </div>
+
+            <div className="rep-kpi-card">
+              <span className="rep-kpi-label">Citaciones</span>
+              <p className="rep-kpi-valor rep-kpi-valor--amber">{metricas.totalCitaciones}</p>
+              <span className="rep-kpi-sub">
+                {metricas.totalCitaciones === 0
+                  ? "Sin citaciones registradas"
+                  : `${metricas.citConfirmadas} confirmada(s) · ${metricas.citPendientes} pendiente(s)`}
+              </span>
+            </div>
+          </div>
+
+          {/* Filtros dinámicos conectados a API / Store */}
+          <div className="rep-filtros">
+            <div className="rep-filtro-campo">
+              <label htmlFor="rep-periodo">Año Académico:</label>
+              <select
+                id="rep-periodo"
+                className="usuarios-select"
+                value={periodoEfectivo}
+                onChange={(e) => handlePeriodoChange(e.target.value)}
+                aria-label="Filtrar por año académico"
+              >
+                <option value="todos">Todos los períodos ({fuentes.cursos.length} cursos)</option>
+                {periodos.map((p) => (
+                  <option key={p} value={p}>
+                    Período {p}{fuentes.estadoPeriodo?.periodos?.vigente === p ? " (vigente)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rep-filtro-campo">
+              <label htmlFor="rep-curso">Filtrar por Curso ({cursosDelPeriodo.length}):</label>
+              <select
+                id="rep-curso"
+                className="usuarios-select"
+                value={cursoEfectivo}
+                onChange={(e) => setCursoSeleccionadoId(e.target.value)}
+                disabled={cursosDelPeriodo.length === 0}
+                aria-label="Filtrar por curso"
+              >
+                {cursosDelPeriodo.length === 0 ? (
+                  <option value="todos">Sin cursos registrados en este período</option>
+                ) : (
+                  <option value="todos">Todos los cursos ({cursosDelPeriodo.length})</option>
+                )}
+                {cursosDelPeriodo.map((c) => (
+                  <option key={c.Curso_Id} value={String(c.Curso_Id)}>
+                    {c.Curso_Nombre || c.curso}
+                    {periodoEfectivo === "todos" && (c.Curso_Periodo_Lectivo || c.periodo)
+                      ? ` (${c.Curso_Periodo_Lectivo || c.periodo})`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {hayFiltroPersonalizado && (
+              <div className="rep-filtro-acciones">
+                <button type="button" className="btn-roles" onClick={limpiarFiltros}>
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="rep-resumen-activo">
+            <span>
+              Mostrando datos reales para <strong>{cursoLabel}</strong> · <strong>{periodoLabel}</strong>
+            </span>
+          </div>
+
+          {/* Tarjetas de Reportes */}
+          <div className="rep-grid">
+            {reportes.map((r) => {
+              const descargandoPdf = descargando === `${r.id}-pdf`;
+              const descargandoExcel = descargando === `${r.id}-excel`;
+              const sinDatos = r.totalRegistros === 0;
+
+              return (
+                <div key={r.id} className="rep-card">
+                  <div>
+                    <div className="rep-card-top">
+                      <span className="rep-card-icono" aria-hidden="true">{r.icono}</span>
+                      <div className="rep-card-badges">
+                        <span className="rep-card-tag">{r.etiqueta}</span>
+                        <span className={`rep-card-count${sinDatos ? " rep-card-count--empty" : ""}`}>
+                          {r.totalRegistros} {r.totalRegistros === 1 ? "registro" : "registros"}
+                        </span>
+                      </div>
+                    </div>
+                    <h3>{r.titulo}</h3>
+                    <p>{r.descripcion}</p>
+                    {sinDatos && <div className="rep-card-vacio">{r.emptyTexto}</div>}
+                  </div>
+
+                  <div className="rep-card-actions">
+                    <button
+                      type="button"
+                      className="rep-btn-preview"
+                      onClick={() => setVistaPreviaId(r.id)}
+                      disabled={sinDatos}
+                    >
+                      👁️ Vista previa
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => handleDescargar(r, "pdf")}
+                      disabled={sinDatos || descargandoPdf}
+                    >
+                      {descargandoPdf ? "Generando..." : "📄 Descargar PDF"}
+                    </button>
+                    <button
+                      type="button"
+                      className="rep-btn-excel"
+                      onClick={() => handleDescargar(r, "excel")}
+                      disabled={sinDatos || descargandoExcel}
+                    >
+                      {descargandoExcel ? "Generando..." : "📊 Descargar Excel"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {vistaPreviaReporte && (
+        <div className="modal-overlay" onClick={() => setVistaPreviaId(null)}>
+          <div
+            className="modal-card rep-modal-wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-preview-reporte"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h2 id="titulo-preview-reporte">{vistaPreviaReporte.titulo}</h2>
+                <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "#64748b" }}>
+                  {cursoLabel} · {periodoLabel} · {vistaPreviaReporte.totalRegistros} registro(s)
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-cerrar"
+                onClick={() => setVistaPreviaId(null)}
+                aria-label="Cerrar vista previa"
+              >
+                ✕
+              </button>
+            </div>
+
+            {vistaPreviaReporte.totalRegistros === 0 ? (
+              <div className="usuarios-empty">{vistaPreviaReporte.emptyTexto}</div>
+            ) : (
+              <div className="rep-preview-wrap">
+                <table className="tabla-usuarios">
+                  <thead>
+                    <tr>
+                      {vistaPreviaReporte.columnas.map((col) => (
+                        <th key={col}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vistaPreviaReporte.filas.map((fila, idx) => (
+                      <tr key={idx}>
+                        {fila.map((celda, cIdx) => (
+                          <td key={cIdx}>{celda}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: "16px", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleDescargar(vistaPreviaReporte, "pdf")}
+                disabled={vistaPreviaReporte.totalRegistros === 0}
+              >
+                📄 Descargar PDF
+              </button>
+              <button
+                type="button"
+                className="btn-roles"
+                onClick={() => handleDescargar(vistaPreviaReporte, "excel")}
+                disabled={vistaPreviaReporte.totalRegistros === 0}
+              >
+                📊 Descargar Excel
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setVistaPreviaId(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

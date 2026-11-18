@@ -12,24 +12,34 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
   const [docenteId, setDocenteId] = useState("");
   const [estudiantes, setEstudiantes] = useState([]);
   const [mensajeEstudiantes, setMensajeEstudiantes] = useState("");
+  const [cursoCargado, setCursoCargado] = useState(null);
+  const cargandoEstudiantes = Boolean(curso?.Curso_Id) && Number(cursoCargado) !== Number(curso?.Curso_Id);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
+    if (!curso?.Curso_Id) return undefined;
     let vivo = true;
     getEstudiantesDeCurso(curso.Curso_Id)
       .then((d) => {
-        if (!vivo || !d) return;
-        setEstudiantes(d.estudiantes || []);
-        setMensajeEstudiantes(d.mensaje || "");
+        if (!vivo) return;
+        setEstudiantes(Array.isArray(d?.estudiantes) ? d.estudiantes : Array.isArray(d) ? d : []);
+        setMensajeEstudiantes(d?.mensaje || "");
       })
-      .catch((e) => vivo && setMensajeEstudiantes(e.message));
+      .catch((e) => {
+        if (!vivo) return;
+        setEstudiantes([]);
+        setMensajeEstudiantes(e?.message || "No fue posible cargar los estudiantes del curso.");
+      })
+      .finally(() => {
+        if (vivo) setCursoCargado(Number(curso.Curso_Id));
+      });
     if (esAdmin) {
       getDocentesActivos().then((d) => vivo && d && setDocentes(d)).catch(() => {});
     }
     return () => { vivo = false; };
-  }, [curso.Curso_Id, esAdmin]);
+  }, [curso?.Curso_Id, esAdmin]);
 
   // Las confirmaciones del backend (reemplazo y situaciones en registro) se piden aquí
   const asignar = async () => {
@@ -116,8 +126,10 @@ export default function PanelJefaturaCurso({ curso, esAdmin, onCambio }) {
       {error && <p className="msg-error">{error}</p>}
 
       <h3>Estudiantes del curso</h3>
-      {estudiantes.length === 0 ? (
-        <p>{mensajeEstudiantes || "Cargando..."}</p>
+      {cargandoEstudiantes ? (
+        <p>Cargando...</p>
+      ) : estudiantes.length === 0 ? (
+        <p>{mensajeEstudiantes || "Este curso no tiene estudiantes asignados."}</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table className="tabla-asignaturas">

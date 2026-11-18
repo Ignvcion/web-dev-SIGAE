@@ -21,10 +21,6 @@ function Administradores() {
   const [msgErrorForm, setMsgErrorForm] = useState("");
   const [msgExitoForm, setMsgExitoForm] = useState("");
 
-  useEffect(() => {
-    cargarAdministradores();
-  }, []);
-
   const cargarAdministradores = async () => {
     setLoading(true);
     setErrorCarga("");
@@ -45,6 +41,10 @@ function Administradores() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => cargarAdministradores());
+  }, []);
 
   const abrirEdicion = (admin) => {
     setEditando(admin);

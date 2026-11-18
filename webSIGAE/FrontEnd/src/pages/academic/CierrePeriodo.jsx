@@ -49,8 +49,15 @@ function CierrePeriodo() {
     return <div className="page-container">{error ? <p className="msg-error">{error}</p> : <p>Cargando...</p>}</div>;
   }
 
-  const { periodos, cursosVigentes, cursosSiguientes, puedeIniciarNuevoPeriodo, motivos, limpieza } = estado;
-  const hayLimpieza = Object.values(limpieza).some((n) => n > 0);
+  const {
+    periodos = {},
+    cursosVigentes = [],
+    cursosSiguientes = [],
+    puedeIniciarNuevoPeriodo = false,
+    motivos = [],
+    limpieza = {},
+  } = estado;
+  const hayLimpieza = Object.values(limpieza || {}).some((n) => n > 0);
 
   return (
     <div className="page-container">

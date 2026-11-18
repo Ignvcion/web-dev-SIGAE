@@ -112,6 +112,7 @@ function ClasesEliminadasMini({ clases }) {
 /* ═══════════════════════════════════════════════════════════════ */
 function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh, onSelectCurso, cursoSeleccionado }) {
   const [vistas, setVistas] = useState({});
+  const [refrescando, setRefrescando] = useState(false);
 
   useEffect(() => {
     document.body.classList.add("horarios-listado-open");
@@ -134,6 +135,35 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh, onSelectCur
       setVistas(p => ({ ...p, [cursoId]: { horarios: Array.isArray(rH) ? rH : [], colorMap } }));
     } catch {
       setVistas(p => ({ ...p, [cursoId]: null }));
+    }
+  };
+
+  const handleRefrescar = async () => {
+    if (refrescando) return;
+    setRefrescando(true);
+    try {
+      await onRefresh?.();
+      const abiertos = Object.keys(vistas).filter(id => vistas[id] && vistas[id] !== "loading");
+      if (abiertos.length > 0) {
+        const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+        const nuevasVistas = { ...vistas };
+        await Promise.all(abiertos.map(async (cursoId) => {
+          try {
+            const [rH, rA] = await Promise.all([
+              fetch(`/api/horarios?curso_id=${cursoId}&incluir_eliminadas=1`, { headers: h }).then(r => r.json()),
+              fetch(`/api/horarios/asignaturas-curso?curso_id=${cursoId}`, { headers: h }).then(r => r.json()),
+            ]);
+            const colorMap = {};
+            (Array.isArray(rA) ? rA : []).forEach((a, i) => { colorMap[a.Asignatura_Id] = ASIG_COLORS[i % ASIG_COLORS.length]; });
+            nuevasVistas[cursoId] = { horarios: Array.isArray(rH) ? rH : [], colorMap };
+          } catch {
+            // mantener estado previo
+          }
+        }));
+        setVistas(nuevasVistas);
+      }
+    } finally {
+      setRefrescando(false);
     }
   };
 
@@ -189,23 +219,34 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh, onSelectCur
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <button
-              onClick={onRefresh}
-              title="Actualizar datos"
+              type="button"
+              onClick={handleRefrescar}
+              disabled={refrescando}
+              title={refrescando ? "Actualizando datos..." : "Actualizar datos"}
+              aria-label="Actualizar datos"
               style={{
-                background: "rgba(255,255,255,0.1)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "#cbd5e1",
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.22)",
+                color: refrescando ? "#60a5fa" : "#cbd5e1",
                 borderRadius: 6,
                 width: 28,
                 height: 28,
-                cursor: "pointer",
-                fontSize: "0.8rem",
+                cursor: refrescando ? "wait" : "pointer",
+                fontSize: "0.85rem",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transition: "all 0.15s ease",
               }}
             >
-              ↺
+              <span
+                style={{
+                  display: "inline-block",
+                  animation: refrescando ? "spin 0.8s linear infinite" : "none",
+                }}
+              >
+                ↺
+              </span>
             </button>
             <button
               onClick={onClose}
@@ -376,8 +417,9 @@ export default function Horarios() {
   const [guardando, setGuardando] = useState(false);
   const [errorPanel, setErrorPanel] = useState("");
 
-  // Bulk suspend
+  // Bulk suspend / reactivate
   const [suspendiendo, setSuspendiendo] = useState(false);
+  const [confirmarAccionMasiva, setConfirmarAccionMasiva] = useState(null);
 
   // Selección múltiple de bloques (CU63 / CU64)
   const [modoSeleccion, setModoSeleccion] = useState(false);
@@ -419,9 +461,9 @@ export default function Horarios() {
       .catch(() => {});
   }, []);
 
-  const cargarHorarios = useCallback(async (cursoId) => {
-    setLoading(true);
-    setError("");
+  // Pide las clases sin mostrar el "cargando" (sincronización silenciosa tras cambios
+  // optimistas). cargarHorarios() además muestra el "cargando" y limpia el error.
+  const pedirHorarios = useCallback(async (cursoId) => {
     try {
       // Con curso (vista de administrador) se piden también las clases eliminadas para el listado
       const url = cursoId ? `${API}/horarios?curso_id=${cursoId}&incluir_eliminadas=1` : `${API}/horarios`;
@@ -435,6 +477,12 @@ export default function Horarios() {
       setLoading(false);
     }
   }, []);
+
+  const cargarHorarios = useCallback((cursoId) => {
+    setLoading(true);
+    setError("");
+    return pedirHorarios(cursoId);
+  }, [pedirHorarios]);
 
   const cargarAsignaturas = useCallback(async (cursoId) => {
     if (!cursoId) { setAsignaturasCurso([]); return; }
@@ -453,18 +501,21 @@ export default function Horarios() {
     try {
       const res = await fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() });
       const data = await res.json();
-      setResumenCursos(res.ok && Array.isArray(data) ? data : []);
+      const lista = res.ok && Array.isArray(data) ? data : [];
+      setResumenCursos(lista);
+      return lista;
     } catch {
       setResumenCursos([]);
+      return [];
     }
   }, []);
 
   useEffect(() => {
-    if (esDocente) cargarHorarios("");
+    if (esDocente) Promise.resolve().then(() => cargarHorarios(""));
   }, [esDocente, cargarHorarios]);
 
   useEffect(() => {
-    if (listadoAbierto) cargarResumenCursos();
+    if (listadoAbierto) Promise.resolve().then(() => cargarResumenCursos());
   }, [listadoAbierto, cargarResumenCursos]);
 
   const alResolverConflicto = () => {
@@ -572,6 +623,14 @@ export default function Horarios() {
 
   const handleCambiarEstado = async (id, estadoActual) => {
     const nuevoEstado = estadoActual === "Activo" ? "Suspendido" : "Activo";
+    // Actualización optimista inmediata
+    setHorarios((prev) =>
+      prev.map((h) =>
+        h.Horario_Asignatura_Id === id
+          ? { ...h, estado: nuevoEstado, Horario_Asignatura_Estado: nuevoEstado }
+          : h
+      )
+    );
     try {
       const res = await fetch(`${API}/horarios/${id}/estado`, {
         method: "PATCH",
@@ -579,9 +638,17 @@ export default function Horarios() {
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+      await pedirHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
     } catch (e) {
+      // Revertir en caso de error
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.Horario_Asignatura_Id === id
+            ? { ...h, estado: estadoActual, Horario_Asignatura_Estado: estadoActual }
+            : h
+        )
+      );
       setError(e.message || "Error al cambiar estado");
     }
   };
@@ -626,28 +693,73 @@ export default function Horarios() {
     }
   };
 
-  const handleSuspenderTodo = async () => {
-    if (!window.confirm(`¿Suspender ${bloquesActivos} bloque(s) activo(s)?`)) return;
+  const handleSuspenderTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (bloquesActivos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "suspender", cantidad: bloquesActivos });
+  };
+
+  const handleReactivarTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (bloquesSuspendidos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "reactivar", cantidad: bloquesSuspendidos });
+  };
+
+  const ejecutarAccionMasiva = async () => {
+    if (!confirmarAccionMasiva || suspendiendo) return;
+    const { tipo } = confirmarAccionMasiva;
     setSuspendiendo(true);
+    setError("");
     try {
-      const activos = horarios.filter((h) => h.estado === "Activo");
+      const targetEstado = tipo === "suspender" ? "Suspendido" : "Activo";
+      const sourceEstado = tipo === "suspender" ? "Activo" : "Suspendido";
+      const lista = horarios.filter((h) => h.estado === sourceEstado && !esEliminada(h));
+
+      if (lista.length === 0) {
+        setConfirmarAccionMasiva(null);
+        return;
+      }
+
+      // Actualización optimista inmediata en la interfaz: evita parpadeos y sensación de reinicio
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.estado === sourceEstado && !esEliminada(h)
+            ? { ...h, estado: targetEstado, Horario_Asignatura_Estado: targetEstado }
+            : h
+        )
+      );
+
       const resultados = await Promise.allSettled(
-        activos.map((h) =>
+        lista.map((h) =>
           fetch(`${API}/horarios/${h.Horario_Asignatura_Id}/estado`, {
             method: "PATCH",
             headers: authHeaders(),
-            body: JSON.stringify({ estado: "Suspendido" }),
+            body: JSON.stringify({ estado: targetEstado }),
           })
         )
       );
-      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value.ok).length;
+
+      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value?.ok).length;
       if (fallidos > 0) {
-        setError(`No se pudieron suspender ${fallidos} de ${activos.length} bloque(s). Revisa el horario e intenta nuevamente.`);
+        setError(
+          `No se pudieron ${tipo === "suspender" ? "suspender" : "reactivar"} ${fallidos} de ${lista.length} bloque(s). Revisa el horario e intenta nuevamente.`
+        );
+      } else {
+        setExito(
+          tipo === "suspender"
+            ? `Se suspendieron correctamente los ${lista.length} bloque(s) de clases del curso.`
+            : `Se reactivaron correctamente los ${lista.length} bloque(s) de clases del curso.`
+        );
+        setTimeout(() => setExito(""), 4000);
       }
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+
+      // Sincronización silenciosa en segundo plano sin desmontar la pantalla (evita setLoading(true))
+      await pedirHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
+      setConfirmarAccionMasiva(null);
     } catch {
-      setError("Error al suspender clases.");
+      await pedirHorarios(cursoSeleccionado);
+      setError(`Error al ${tipo === "suspender" ? "suspender" : "reactivar"} las clases.`);
     } finally {
       setSuspendiendo(false);
     }
@@ -682,6 +794,7 @@ export default function Horarios() {
   const cursoObj = cursos.find((c) => String(c.Curso_Id) === String(cursoSeleccionado));
   const horariosVigentes = horarios.filter((h) => !esEliminada(h));
   const bloquesActivos = horarios.filter((h) => h.estado === "Activo").length;
+  const bloquesSuspendidos = horarios.filter((h) => h.estado === "Suspendido" && !esEliminada(h)).length;
 
   const preview =
     panelAbierto && !modoEdicion && form.Bloque_Horario_Id && form.Horario_Asignatura_Dia_Semana
@@ -900,16 +1013,33 @@ export default function Horarios() {
                 </div>
               )}
 
-              {/* Bulk suspend */}
-              {bloquesActivos > 0 && (
-                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb" }}>
-                  <button
-                    style={s.btnSuspenderTodo}
-                    onClick={handleSuspenderTodo}
-                    disabled={suspendiendo}
-                  >
-                    {suspendiendo ? "Suspendiendo..." : "⚠ Suspender todas las clases"}
-                  </button>
+              {/* Bulk suspend / reactivate */}
+              {(bloquesActivos > 0 || bloquesSuspendidos > 0) && (
+                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bloquesActivos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnSuspenderTodo}
+                      onClick={handleSuspenderTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "suspender"
+                        ? "Suspendiendo..."
+                        : `⚠ Suspender todas las clases (${bloquesActivos})`}
+                    </button>
+                  )}
+                  {bloquesSuspendidos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnReactivarTodo}
+                      onClick={handleReactivarTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "reactivar"
+                        ? "Reactivando..."
+                        : `⟳ Reactivar clases suspendidas (${bloquesSuspendidos})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1050,6 +1180,101 @@ export default function Horarios() {
         <DetalleBloqueModal horarioId={detalleBloqueId} onClose={() => setDetalleBloqueId(null)} />
       )}
 
+      {/* Modal de confirmación para suspender/reactivar todas las clases */}
+      {confirmarAccionMasiva && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "1rem",
+          }}
+          onClick={() => !suspendiendo && setConfirmarAccionMasiva(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              maxWidth: "440px",
+              width: "100%",
+              padding: "1.5rem",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <span style={{ fontSize: "1.5rem" }}>
+                {confirmarAccionMasiva.tipo === "suspender" ? "⚠️" : "🔄"}
+              </span>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#1e293b" }}>
+                {confirmarAccionMasiva.tipo === "suspender"
+                  ? "¿Suspender todas las clases?"
+                  : "¿Reactivar todas las clases?"}
+              </h3>
+            </div>
+            <p style={{ margin: "0 0 1.25rem", color: "#4b5563", fontSize: "0.88rem", lineHeight: 1.5 }}>
+              {confirmarAccionMasiva.tipo === "suspender"
+                ? `¿Confirmas que deseas suspender los ${confirmarAccionMasiva.cantidad} bloque(s) activo(s) del curso ${cursoObj?.Curso_Nombre || ""}? Las clases continuarán en el horario pero figurarán marcadas como suspendidas.`
+                : `¿Confirmas que deseas reactivar los ${confirmarAccionMasiva.cantidad} bloque(s) suspendido(s) del curso ${cursoObj?.Curso_Nombre || ""}?`}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setConfirmarAccionMasiva(null)}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "1px solid #d1d5db",
+                  background: "#ffffff",
+                  color: "#374151",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  ejecutarAccionMasiva();
+                }}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: confirmarAccionMasiva.tipo === "suspender" ? "#d97706" : "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "wait" : "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                {suspendiendo && (
+                  <span style={{ display: "inline-block", animation: "spin 0.8s linear infinite" }}>↺</span>
+                )}
+                {suspendiendo
+                  ? (confirmarAccionMasiva.tipo === "suspender" ? "Suspendiendo..." : "Reactivando...")
+                  : (confirmarAccionMasiva.tipo === "suspender" ? "Sí, suspender clases" : "Sí, reactivar clases")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clases pendientes de reubicar tras redefinir la jornada o los bloques */}
       {esAdmin && <PanelConflictos onCambio={alResolverConflicto} />}
 
@@ -1078,7 +1303,6 @@ function VistaBloqueGrid({
   bloques,
   horarios,
   esAdmin,
-  asignaturaActiva,
   colorMap,
   preview,
   onCelda,
@@ -1691,8 +1915,10 @@ function PanelForm({
     !!form.Asignatura_Id && !!form.Bloque_Horario_Id && !!form.Horario_Asignatura_Dia_Semana;
 
   useEffect(() => {
-    if (!camposListos) { setDocentesInfo([]); return; }
-    setCargandoDoc(true);
+    if (!camposListos) {
+      Promise.resolve().then(() => setDocentesInfo([]));
+      return;
+    }
     const params = new URLSearchParams({
       asignatura_id: form.Asignatura_Id,
       bloque_id: form.Bloque_Horario_Id,
@@ -1700,9 +1926,15 @@ function PanelForm({
     });
     if (modoEdicion && idEditando) params.append("horario_id", idEditando);
 
-    fetch(`/api/horarios/docentes-disponibles?${params}`, { headers: authHeaders() })
+    let cancelado = false;
+    Promise.resolve()
+      .then(() => {
+        if (!cancelado) setCargandoDoc(true);
+        return fetch(`/api/horarios/docentes-disponibles?${params}`, { headers: authHeaders() });
+      })
       .then((r) => r.json())
       .then((data) => {
+        if (cancelado) return;
         const asig = asignaturasCurso.find((a) => a.Asignatura_Id === Number(form.Asignatura_Id));
         const asigLow = (asig?.Asignatura_Nombre || "").toLowerCase();
         const enriched = data.map((d) => {
@@ -1721,9 +1953,10 @@ function PanelForm({
         });
         setDocentesInfo(enriched);
       })
-      .catch(() => setDocentesInfo([]))
-      .finally(() => setCargandoDoc(false));
-  }, [form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, modoEdicion, idEditando]);
+      .catch(() => { if (!cancelado) setDocentesInfo([]); })
+      .finally(() => { if (!cancelado) setCargandoDoc(false); });
+    return () => { cancelado = true; };
+  }, [camposListos, form.Asignatura_Id, form.Bloque_Horario_Id, form.Horario_Asignatura_Dia_Semana, modoEdicion, idEditando, asignaturasCurso]);
 
   const sugeridos = docentesInfo.filter((d) => d.disponible && d.coincide_especialidad);
   const disponibles = docentesInfo.filter((d) => d.disponible && !d.coincide_especialidad);
@@ -2713,6 +2946,18 @@ const s = {
     background: "#fef3c7",
     border: "1px solid #fcd34d",
     color: "#92400e",
+    padding: "0.4rem 0.75rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.78rem",
+    textAlign: "center",
+  },
+  btnReactivarTodo: {
+    width: "100%",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    color: "#1d4ed8",
     padding: "0.4rem 0.75rem",
     borderRadius: "6px",
     cursor: "pointer",

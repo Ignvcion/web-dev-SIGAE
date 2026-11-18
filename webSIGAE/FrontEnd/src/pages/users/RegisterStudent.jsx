@@ -36,11 +36,11 @@ function RegisterStudent() {
 
   useEffect(() => {
     if (!formData.rut || !validarRut(formData.rut)) {
-      setRutExiste(false);
+      Promise.resolve().then(() => setRutExiste(false));
       return;
     }
-    setVerificandoRut(true);
     const timeout = setTimeout(async () => {
+      setVerificandoRut(true);
       try {
         const data = await verificarRutEstudiante(formData.rut);
         setRutExiste(data.existe);

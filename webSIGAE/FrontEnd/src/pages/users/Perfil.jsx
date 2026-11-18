@@ -69,11 +69,16 @@ function Perfil() {
 
   useEffect(() => {
     if (!idObjetivo) return;
-    setCargando(true);
-    setErrorPerfil("");
-    apiFetch(`/api/usuarios/${idObjetivo}`)
+    let cancelado = false;
+    Promise.resolve()
+      .then(() => {
+        if (cancelado) return null;
+        setCargando(true);
+        setErrorPerfil("");
+        return apiFetch(`/api/usuarios/${idObjetivo}`);
+      })
       .then(async (r) => {
-        if (!r) return; // sesión expirada: apiFetch ya redirigió
+        if (!r || cancelado) return; // sesión expirada: apiFetch ya redirigió
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
           // CU18 - Excepción "Falta de permisos" u otro rechazo del backend
@@ -85,17 +90,24 @@ function Perfil() {
           : data;
         setDatos(userObj);
       })
-      .catch(() => setErrorPerfil("No fue posible cargar el perfil"))
-      .finally(() => setCargando(false));
+      .catch(() => { if (!cancelado) setErrorPerfil("No fue posible cargar el perfil"); })
+      .finally(() => { if (!cancelado) setCargando(false); });
+    return () => { cancelado = true; };
   }, [idObjetivo]);
 
   useEffect(() => {
     if (!datos?.Es_Docente || !idObjetivo) return;
-    setCargandoAsignaciones(true);
-    setErrorAsignaciones("");
-    setMensajeAsignaciones("");
-    getAsignacionesDocente(idObjetivo)
+    let cancelado = false;
+    Promise.resolve()
+      .then(() => {
+        if (cancelado) return null;
+        setCargandoAsignaciones(true);
+        setErrorAsignaciones("");
+        setMensajeAsignaciones("");
+        return getAsignacionesDocente(idObjetivo);
+      })
       .then((data) => {
+        if (!data || cancelado) return;
         if (Array.isArray(data)) {
           setAsignaciones(data);
         } else {
@@ -106,18 +118,25 @@ function Perfil() {
       })
       .catch((error) => {
         // Excepción 2 (docente no encontrado) y Excepción 3 (error técnico)
-        setErrorAsignaciones(error.message || "No fue posible cargar las asignaciones académicas, reintente más tarde");
+        if (!cancelado) setErrorAsignaciones(error.message || "No fue posible cargar las asignaciones académicas, reintente más tarde");
       })
-      .finally(() => setCargandoAsignaciones(false));
+      .finally(() => { if (!cancelado) setCargandoAsignaciones(false); });
+    return () => { cancelado = true; };
   }, [datos?.Es_Docente, idObjetivo]);
 
   useEffect(() => {
     if (!datos?.Es_Apoderado || !idObjetivo) return;
-    setCargandoEstudiantes(true);
-    setErrorEstudiantes("");
-    setMensajeEstudiantes("");
-    getEstudiantesAsociados(idObjetivo)
+    let cancelado = false;
+    Promise.resolve()
+      .then(() => {
+        if (cancelado) return null;
+        setCargandoEstudiantes(true);
+        setErrorEstudiantes("");
+        setMensajeEstudiantes("");
+        return getEstudiantesAsociados(idObjetivo);
+      })
       .then((data) => {
+        if (!data || cancelado) return;
         if (Array.isArray(data)) {
           setEstudiantesAsociados(data);
         } else {
@@ -599,11 +618,12 @@ function Perfil() {
                 alt="Vista previa de la fotografía"
                 style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
               />
-              <form style={{ display: "flex", flexDirection: "column", gap: "10px" }} onSubmit={handleSubirFoto}>
+              <form style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: 0, maxWidth: "100%", flex: "1 1 200px" }} onSubmit={handleSubirFoto}>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleSeleccionArchivo}
+                  style={{ maxWidth: "100%", width: "100%" }}
                 />
                 {msgExitoFoto && <div className="msg-exito">{msgExitoFoto}</div>}
                 {msgErrorFoto && <div className="msg-error-form">{msgErrorFoto}</div>}

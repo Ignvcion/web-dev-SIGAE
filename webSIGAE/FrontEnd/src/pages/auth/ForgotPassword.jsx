@@ -196,7 +196,7 @@ function ForgotPassword() {
               try {
                 const parsed = new URL(devResetLink);
                 devResetPath = parsed.pathname + parsed.search;
-              } catch (_) {}
+              } catch { /* ignore */ }
               return (
                 <div style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef3c7", border: "1px solid #d97706", borderRadius: "6px" }}>
                   <p style={{ fontSize: "0.8rem", color: "#92400e", marginBottom: "0.5rem", fontWeight: 600 }}>

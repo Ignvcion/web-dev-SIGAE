@@ -10,10 +10,6 @@ function Docentes() {
   const [mensajeInfo, setMensajeInfo] = useState("");
   const [errorCarga, setErrorCarga] = useState("");
 
-  useEffect(() => {
-    cargarDocentes({ especialidad: "", estado: "" });
-  }, []);
-
   const cargarDocentes = async (filtros) => {
     setLoading(true);
     setErrorCarga("");
@@ -35,15 +31,19 @@ function Docentes() {
     }
   };
 
+  useEffect(() => {
+    Promise.resolve().then(() => cargarDocentes({ especialidad: "", estado: "" }));
+  }, []);
+
   const aplicarFiltros = (e) => {
     e.preventDefault();
-    cargarDocentes({ especialidad, estado });
+    cargarDocentes({ busqueda: especialidad, especialidad, criterio: especialidad, estado });
   };
 
   const limpiarFiltros = () => {
     setEspecialidad("");
     setEstado("");
-    cargarDocentes({ especialidad: "", estado: "" });
+    cargarDocentes({ busqueda: "", especialidad: "", criterio: "", estado: "" });
   };
 
   const alternarOrden = (campo) => {
@@ -89,7 +89,7 @@ function Docentes() {
         <input
           type="text"
           className="usuarios-search"
-          placeholder="Buscar por especialidad..."
+          placeholder="Buscar por nombre, RUT o especialidad..."
           value={especialidad}
           onChange={(e) => setEspecialidad(e.target.value)}
         />
@@ -139,7 +139,7 @@ function Docentes() {
           </thead>
           <tbody>
             {docentesOrdenados.map((d, idx) => (
-              <tr key={d.Usuario_Id}>
+              <tr key={`${d.Usuario_Id || "doc"}-${d.Usuario_RUT || idx}-${idx}`}>
                 <td>{idx + 1}</td>
                 <td>{d.Usuario_Nombre_Completo}</td>
                 <td>{d.Usuario_RUT}</td>

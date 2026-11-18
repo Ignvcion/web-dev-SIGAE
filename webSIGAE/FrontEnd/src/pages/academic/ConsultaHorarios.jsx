@@ -34,14 +34,22 @@ function fechaLegible(f) {
   return f ? f.split("-").reverse().join("-") : "";
 }
 
-// Criterios en grilla compacta: varias columnas en escritorio, una en móvil
-const ESTILO_FORM = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-  gap: "10px",
-  alignItems: "center",
-  marginBottom: "16px",
-};
+function errorFechaHabil(fecha) {
+  if (!fecha) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return "Formato de fecha inválido (usa AAAA-MM-DD).";
+  }
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+    return "La fecha ingresada no existe en el calendario.";
+  }
+  const dia = dt.getDay();
+  if (dia === 0 || dia === 6) {
+    return "La fecha seleccionada es fin de semana. Elige un día hábil (lunes a viernes).";
+  }
+  return "";
+}
 
 const lista = (resultado) =>
   resultado.status === "fulfilled" && Array.isArray(resultado.value) ? resultado.value : [];
@@ -58,6 +66,8 @@ function ConsultaHorarios() {
   // Criterios disponibles
   const [opciones, setOpciones] = useState({ docentes: [], cursos: [], niveles: [], asignaturas: [], jornadas: [] });
   const [cargandoOpciones, setCargandoOpciones] = useState(true);
+  const [errorCargaOpciones, setErrorCargaOpciones] = useState("");
+  const [intentoCarga, setIntentoCarga] = useState(0);
 
   // CU68
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
@@ -86,8 +96,15 @@ function ConsultaHorarios() {
       getNivelesEducativos(),
       getAsignaturasHorario(),
       getBloquesInstitucionales(),
-    ]).then(([docentes, cursos, niveles, asignaturas, bloques]) => {
+    ]).then((resultados) => {
       if (!activo) return;
+      const [docentes, cursos, niveles, asignaturas, bloques] = resultados;
+      const todasFallaron = resultados.every((r) => r.status === "rejected");
+      if (todasFallaron) {
+        setErrorCargaOpciones("No se pudieron cargar los criterios de búsqueda. Verifica tu conexión e intenta nuevamente.");
+      } else {
+        setErrorCargaOpciones("");
+      }
       const jornadas = [...new Set(lista(bloques).map((b) => b.Bloque_Horario_Jornada).filter(Boolean))];
       setOpciones({
         docentes: lista(docentes),
@@ -99,17 +116,50 @@ function ConsultaHorarios() {
       setCargandoOpciones(false);
     });
     return () => { activo = false; };
-  }, []);
+  }, [intentoCarga]);
+
+  const reintentarCargaOpciones = () => {
+    setCargandoOpciones(true);
+    setErrorCargaOpciones("");
+    setIntentoCarga((n) => n + 1);
+  };
 
   // CU68 Excepción 1: no existen filtros disponibles por falta de datos asociados
   const sinFiltrosDisponibles =
     !cargandoOpciones &&
+    !errorCargaOpciones &&
     opciones.docentes.length === 0 &&
     opciones.cursos.length === 0 &&
     opciones.asignaturas.length === 0;
 
-  const cambiarFiltro = (campo) => (e) => setFiltros((prev) => ({ ...prev, [campo]: e.target.value }));
-  const cambiarCriterioLibre = (campo) => (e) => setCriteriosLibres((prev) => ({ ...prev, [campo]: e.target.value }));
+  const avisoFechaLibre = useMemo(
+    () => errorFechaHabil(criteriosLibres.fecha),
+    [criteriosLibres.fecha]
+  );
+
+  const cambiarFiltro = (campo) => (e) => {
+    setErrorFiltro("");
+    setFiltros((prev) => ({ ...prev, [campo]: e.target.value }));
+  };
+
+  const cambiarCriterioLibre = (campo) => (e) => {
+    const valor = e.target.value;
+    setErrorLibres("");
+    setMensajeLibres("");
+    setCriteriosLibres((prev) => {
+      if (campo === "fecha") {
+        // Al seleccionar fecha puntual, el día de semana queda fijado por esa fecha
+        return { ...prev, fecha: valor, ...(valor ? { dia_semana: "" } : {}) };
+      }
+      return { ...prev, [campo]: valor };
+    });
+  };
+
+  const quitarFechaLibre = () => {
+    setErrorLibres("");
+    setMensajeLibres("");
+    setCriteriosLibres((prev) => ({ ...prev, fecha: "" }));
+  };
 
   const buscarHorarios = async (e) => {
     e?.preventDefault();
@@ -144,6 +194,14 @@ function ConsultaHorarios() {
 
   const consultarLibres = async (e) => {
     e?.preventDefault();
+    const errorFecha = errorFechaHabil(criteriosLibres.fecha);
+    if (errorFecha) {
+      setConsultadoLibres(true);
+      setBloquesLibres([]);
+      setMensajeLibres("");
+      setErrorLibres(errorFecha);
+      return;
+    }
     setConsultandoLibres(true);
     setConsultadoLibres(true);
     setErrorLibres("");
@@ -166,31 +224,43 @@ function ConsultaHorarios() {
     }
   };
 
+  const limpiarLibres = () => {
+    setCriteriosLibres(LIBRES_VACIOS);
+    setBloquesLibres([]);
+    setConsultadoLibres(false);
+    setMensajeLibres("");
+    setErrorLibres("");
+  };
+
   // Bloques libres agrupados por día para leerlos como una agenda semanal
   const libresPorDia = useMemo(() => {
     const grupos = new Map();
     bloquesLibres.forEach((b) => {
-      if (!grupos.has(b.dia)) grupos.set(b.dia, []);
-      grupos.get(b.dia).push(b);
+      const diaNorm = b.dia === "Miercoles" ? "Miércoles" : b.dia;
+      if (!grupos.has(diaNorm)) grupos.set(diaNorm, []);
+      grupos.get(diaNorm).push(b);
     });
-    return DIAS.filter((d) => grupos.has(d)).map((d) => ({ dia: d, fecha: grupos.get(d)[0].fecha, bloques: grupos.get(d) }));
+    return DIAS.filter((d) => grupos.has(d)).map((d) => {
+      const listaDia = [...grupos.get(d)].sort((a, b) =>
+        String(a.horaInicio || "").localeCompare(String(b.horaInicio || ""))
+      );
+      return { dia: d, fecha: listaDia[0].fecha, bloques: listaDia };
+    });
   }, [bloquesLibres]);
 
-  const estiloPestana = (activa) => ({
-    padding: "0.5rem 1rem",
-    borderRadius: "8px",
-    border: "1px solid #c7d2fe",
-    background: activa ? "#4f46e5" : "#fff",
-    color: activa ? "#fff" : "#4f46e5",
-    fontWeight: 600,
-    cursor: "pointer",
-  });
-
-  const selector = (etiqueta, valor, onChange, opcionesSelect, textoVacio) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label style={{ fontSize: "0.82rem", fontWeight: 600, color: "#374151" }}>{etiqueta}:</label>
-      <select className="usuarios-select" style={{ width: "100%" }} aria-label={etiqueta} value={valor} onChange={onChange}>
-        <option value="">{textoVacio}</option>
+  const campoSelect = (id, etiqueta, valor, onChange, opcionesSelect, textoVacio, disabled = false) => (
+    <div className="ch-campo">
+      <label htmlFor={id}>{etiqueta}:</label>
+      <select
+        id={id}
+        className="usuarios-select"
+        style={{ width: "100%" }}
+        aria-label={etiqueta}
+        value={valor}
+        onChange={onChange}
+        disabled={disabled}
+      >
+        {textoVacio !== null && <option value="">{textoVacio}</option>}
         {opcionesSelect}
       </select>
     </div>
@@ -225,12 +295,20 @@ function ConsultaHorarios() {
         <p>Filtra los horarios institucionales, consulta bloques libres y revisa el detalle de cada bloque</p>
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem", flexWrap: "wrap" }}>
-        <button type="button" style={estiloPestana(pestana === "filtrar")} onClick={() => setPestana("filtrar")}>
+      <div className="ch-tabs">
+        <button
+          type="button"
+          className={`ch-tab-btn${pestana === "filtrar" ? " ch-tab-btn--activa" : ""}`}
+          onClick={() => setPestana("filtrar")}
+        >
           Filtrar horarios
         </button>
         {esAdmin && (
-          <button type="button" style={estiloPestana(pestana === "libres")} onClick={() => setPestana("libres")}>
+          <button
+            type="button"
+            className={`ch-tab-btn${pestana === "libres" ? " ch-tab-btn--activa" : ""}`}
+            onClick={() => setPestana("libres")}
+          >
             Bloques libres
           </button>
         )}
@@ -238,27 +316,40 @@ function ConsultaHorarios() {
 
       {cargandoOpciones && <p>Cargando criterios de búsqueda...</p>}
 
+      {!cargandoOpciones && errorCargaOpciones && (
+        <div className="usuarios-empty" style={{ color: "#dc2626" }}>
+          <p style={{ margin: "0 0 10px" }}>{errorCargaOpciones}</p>
+          <button type="button" className="btn-secondary" onClick={reintentarCargaOpciones}>
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* ── CU68: Filtrando horarios ── */}
-      {!cargandoOpciones && pestana === "filtrar" && (
+      {!cargandoOpciones && !errorCargaOpciones && pestana === "filtrar" && (
         <>
           {sinFiltrosDisponibles ? (
             <div className="usuarios-empty">
               No existen filtros disponibles por falta de datos asociados en el sistema.
             </div>
           ) : (
-            <form style={ESTILO_FORM} onSubmit={buscarHorarios}>
-              {selector("Docente", filtros.docente_id, cambiarFiltro("docente_id"), opcionesDocentes, "Todos los docentes")}
-              {selector("Curso específico", filtros.curso_id, cambiarFiltro("curso_id"), opcionesCursos, "Todos los cursos (ej: 1° Básico A)")}
-              {selector(
+            <form className="ch-filtros-grid" onSubmit={buscarHorarios}>
+              {campoSelect("ch-filtro-docente", "Docente", filtros.docente_id, cambiarFiltro("docente_id"), opcionesDocentes, "Todos los docentes")}
+              {campoSelect("ch-filtro-curso", "Curso específico", filtros.curso_id, cambiarFiltro("curso_id"), opcionesCursos, "Todos los cursos (ej: 1° Básico A)")}
+              {campoSelect(
+                "ch-filtro-nivel",
                 "Nivel educativo general",
                 filtros.nivel_educativo_id,
                 cambiarFiltro("nivel_educativo_id"),
                 (opciones.niveles || []).map((n) => (
-                  <option key={n.Nivel_Educativo_Id || n.Nivel_Id} value={n.Nivel_Educativo_Id || n.Nivel_Id}>{n.Nivel_Educativo_Nombre || n.Nivel_Nombre}</option>
+                  <option key={n.Nivel_Educativo_Id || n.Nivel_Id} value={n.Nivel_Educativo_Id || n.Nivel_Id}>
+                    {n.Nivel_Educativo_Nombre || n.Nivel_Nombre}
+                  </option>
                 )),
                 "Todos los niveles"
               )}
-              {selector(
+              {campoSelect(
+                "ch-filtro-asig",
                 "Asignatura",
                 filtros.asignatura_id,
                 cambiarFiltro("asignatura_id"),
@@ -267,25 +358,28 @@ function ConsultaHorarios() {
                 )),
                 "Todas las asignaturas"
               )}
-              {selector("Jornada", filtros.jornada, cambiarFiltro("jornada"), opcionesJornadas, "Todas las jornadas")}
-              {selector("Día", filtros.dia_semana, cambiarFiltro("dia_semana"), opcionesDias, "Todos los días")}
-              <select
-                className="usuarios-select"
-                style={{ width: "100%" }}
-                aria-label="Estado"
-                value={filtros.estado}
-                onChange={cambiarFiltro("estado")}
-              >
-                <option value="Activo">Activos</option>
-                <option value="Suspendido">Suspendidos</option>
-                <option value="Todos">Todos los estados</option>
-              </select>
-              <button type="submit" className="btn-primary" disabled={buscando}>
-                {buscando ? "Buscando..." : "Buscar"}
-              </button>
-              <button type="button" className="btn-secondary" onClick={limpiarFiltros} disabled={buscando}>
-                Limpiar
-              </button>
+              {campoSelect("ch-filtro-jornada", "Jornada", filtros.jornada, cambiarFiltro("jornada"), opcionesJornadas, "Todas las jornadas")}
+              {campoSelect("ch-filtro-dia", "Día", filtros.dia_semana, cambiarFiltro("dia_semana"), opcionesDias, "Todos los días")}
+              {campoSelect(
+                "ch-filtro-estado",
+                "Estado",
+                filtros.estado,
+                cambiarFiltro("estado"),
+                <>
+                  <option value="Activo">Activos</option>
+                  <option value="Suspendido">Suspendidos</option>
+                  <option value="Todos">Todos los estados</option>
+                </>,
+                null
+              )}
+              <div className="ch-acciones">
+                <button type="submit" className="btn-primary" disabled={buscando}>
+                  {buscando ? "Buscando..." : "Buscar"}
+                </button>
+                <button type="button" className="btn-secondary" onClick={limpiarFiltros} disabled={buscando}>
+                  Limpiar
+                </button>
+              </div>
             </form>
           )}
 
@@ -298,8 +392,8 @@ function ConsultaHorarios() {
           {horarios.length > 0 && (
             <>
               <p style={{ color: "#64748b", fontSize: "0.85rem" }}>{horarios.length} bloque(s) encontrado(s)</p>
-              <div className="tabla-responsive-container">
-                <table className="tabla-usuarios">
+              <div className="tabla-responsive-container tabla-responsive-container--cards">
+                <table className="tabla-usuarios tabla-estudiantes ch-tabla-filtrar">
                   <thead>
                     <tr>
                       <th>Día</th>
@@ -315,20 +409,22 @@ function ConsultaHorarios() {
                   <tbody>
                     {horarios.map((h) => (
                       <tr key={h.Horario_Asignatura_Id}>
-                        <td style={{ fontWeight: 600 }}>{h.dia}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>{hhmm(h.horaInicio || h.hora_inicio)} - {hhmm(h.horaFin || h.hora_fin)}</td>
-                        <td>{h.jornada || "Mañana"}</td>
-                        <td>{h.curso}</td>
-                        <td>{h.asignatura}</td>
-                        <td>{h.docente}</td>
-                        <td>
-      {h.estado === "Inactivo" || h.estado === "Suspendido" ? (
-        <span className="badge-inactivo">{h.estado}</span>
-      ) : (
-        <span className="badge-activo">Activo</span>
-      )}
-    </td>
-                        <td>
+                        <td className="est-col-nombre" data-label="Día" style={{ fontWeight: 600 }}>{h.dia}</td>
+                        <td data-label="Horario" style={{ whiteSpace: "nowrap" }}>
+                          {hhmm(h.horaInicio || h.hora_inicio)} - {hhmm(h.horaFin || h.hora_fin)}
+                        </td>
+                        <td data-label="Jornada">{h.jornada || "Mañana"}</td>
+                        <td data-label="Curso">{h.curso}</td>
+                        <td data-label="Asignatura">{h.asignatura}</td>
+                        <td data-label="Docente">{h.docente}</td>
+                        <td className="est-col-estado" data-label="Estado">
+                          {h.estado === "Inactivo" || h.estado === "Suspendido" ? (
+                            <span className="badge-inactivo">{h.estado}</span>
+                          ) : (
+                            <span className="badge-activo">Activo</span>
+                          )}
+                        </td>
+                        <td className="est-col-acciones" data-label="Acciones">
                           <button
                             type="button"
                             className="btn-secondary"
@@ -348,28 +444,70 @@ function ConsultaHorarios() {
       )}
 
       {/* ── CU67: Visualizando disponibilidad de bloques libres ── */}
-      {!cargandoOpciones && pestana === "libres" && esAdmin && (
+      {!cargandoOpciones && !errorCargaOpciones && pestana === "libres" && esAdmin && (
         <>
-          <form style={ESTILO_FORM} onSubmit={consultarLibres}>
-            {selector("Curso", criteriosLibres.curso_id, cambiarCriterioLibre("curso_id"), opcionesCursos, "Toda la institución")}
-            {selector("Docente", criteriosLibres.docente_id, cambiarCriterioLibre("docente_id"), opcionesDocentes, "Cualquier docente")}
+          <form className="ch-filtros-grid" onSubmit={consultarLibres}>
+            {campoSelect("ch-libres-curso", "Curso", criteriosLibres.curso_id, cambiarCriterioLibre("curso_id"), opcionesCursos, "Toda la institución")}
+            {campoSelect("ch-libres-docente", "Docente", criteriosLibres.docente_id, cambiarCriterioLibre("docente_id"), opcionesDocentes, "Cualquier docente")}
             {/* Con una fecha puntual, el día de la semana queda definido por ella */}
             {criteriosLibres.fecha
-              ? <select className="usuarios-select" style={{ width: "100%" }} aria-label="Día" disabled><option>Día según la fecha</option></select>
-              : selector("Día", criteriosLibres.dia_semana, cambiarCriterioLibre("dia_semana"), opcionesDias, "Todos los días")}
-            {selector("Jornada", criteriosLibres.jornada, cambiarCriterioLibre("jornada"), opcionesJornadas, "Todas las jornadas")}
-            <input
-              type="date"
-              className="usuarios-select"
-              style={{ width: "100%", boxSizing: "border-box" }}
-              aria-label="Fecha"
-              title="Fecha a evaluar (opcional)"
-              value={criteriosLibres.fecha}
-              onChange={cambiarCriterioLibre("fecha")}
-            />
-            <button type="submit" className="btn-primary" disabled={consultandoLibres}>
-              {consultandoLibres ? "Consultando..." : "Consultar disponibilidad"}
-            </button>
+              ? campoSelect(
+                  "ch-libres-dia",
+                  "Día",
+                  "",
+                  () => {},
+                  <option value="">Día según la fecha</option>,
+                  null,
+                  true
+                )
+              : campoSelect("ch-libres-dia", "Día", criteriosLibres.dia_semana, cambiarCriterioLibre("dia_semana"), opcionesDias, "Todos los días")}
+            {campoSelect("ch-libres-jornada", "Jornada", criteriosLibres.jornada, cambiarCriterioLibre("jornada"), opcionesJornadas, "Todas las jornadas")}
+            <div className="ch-campo">
+              <label htmlFor="ch-libres-fecha">Fecha:</label>
+              <div className="ch-fecha-wrap">
+                <input
+                  id="ch-libres-fecha"
+                  type="date"
+                  className="ch-input-date"
+                  aria-label="Fecha (opcional)"
+                  title="Fecha a evaluar (opcional)"
+                  value={criteriosLibres.fecha}
+                  onClick={(e) => {
+                    try {
+                      e.target.showPicker?.();
+                    } catch {
+                      // Ignorar si el navegador no soporta showPicker
+                    }
+                  }}
+                  onChange={cambiarCriterioLibre("fecha")}
+                />
+                {!criteriosLibres.fecha && (
+                  <span className="ch-fecha-placeholder">
+                    Fecha (opcional)
+                  </span>
+                )}
+                {criteriosLibres.fecha && (
+                  <button
+                    type="button"
+                    className="ch-btn-quitar-fecha"
+                    onClick={quitarFechaLibre}
+                    aria-label="Quitar fecha"
+                    title="Quitar fecha"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {avisoFechaLibre && <span className="ch-campo-error">{avisoFechaLibre}</span>}
+            </div>
+            <div className="ch-acciones">
+              <button type="submit" className="btn-primary" disabled={consultandoLibres}>
+                {consultandoLibres ? "Consultando..." : "Consultar disponibilidad"}
+              </button>
+              <button type="button" className="btn-secondary" onClick={limpiarLibres} disabled={consultandoLibres}>
+                Limpiar
+              </button>
+            </div>
           </form>
 
           <p style={{ color: "#64748b", fontSize: "0.85rem", marginTop: 0 }}>
@@ -389,48 +527,27 @@ function ConsultaHorarios() {
               <p style={{ color: "#065f46", fontSize: "0.88rem", fontWeight: 700, margin: "0.75rem 0 0.5rem" }}>
                 ✓ {bloquesLibres.length} bloque(s) libre(s) disponible(s)
               </p>
-              <div style={{ overflowX: "auto" }}>
-              <table className="tabla-usuarios">
-                <thead>
-                  <tr>
-                    <th>Día</th>
-                    <th>Bloques libres</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {libresPorDia.map(({ dia, fecha, bloques }) => (
-                    <tr key={dia}>
-                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                        {dia}
-                        {fecha && (
-                          <div style={{ fontWeight: 400, fontSize: "0.8rem", color: "#64748b" }}>{fechaLegible(fecha)}</div>
-                        )}
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                          {bloques.map((b) => (
-                            <span
-                              key={`${dia}-${b.bloqueId}`}
-                              style={{
-                                padding: "0.2rem 0.6rem",
-                                borderRadius: "999px",
-                                background: "#ecfdf5",
-                                border: "1px solid #a7f3d0",
-                                color: "#065f46",
-                                fontSize: "0.82rem",
-                              }}
-                              title={`${b.jornada} · ${b.tipo}`}
-                            >
-                              {hhmm(b.horaInicio)} - {hhmm(b.horaFin)}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+              <div className="ch-libres-grid">
+                {libresPorDia.map(({ dia, fecha, bloques }) => (
+                  <div key={dia} className="ch-libre-card">
+                    <div className="ch-libre-card-head">
+                      <span className="ch-libre-dia">{dia}</span>
+                      {fecha && <span className="ch-libre-fecha">{fechaLegible(fecha)}</span>}
+                    </div>
+                    <div className="ch-libre-pills">
+                      {bloques.map((b) => (
+                        <span
+                          key={`${dia}-${b.bloqueId}`}
+                          className="ch-libre-pill"
+                          title={`${b.jornada} · ${b.tipo}`}
+                        >
+                          {hhmm(b.horaInicio)} - {hhmm(b.horaFin)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </>

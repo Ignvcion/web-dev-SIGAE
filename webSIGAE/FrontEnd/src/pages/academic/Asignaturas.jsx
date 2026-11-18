@@ -1,7 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const PRIORIDADES = ["Alta", "Media", "Baja"];
+
+const deduplicarAsignaturas = (lista) => {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
+  let maxId = 1000;
+  for (const a of lista) {
+    const idNum = Number(a?.Asignatura_Id);
+    if (!isNaN(idNum) && idNum > maxId) maxId = idNum;
+  }
+  return lista.map((a) => {
+    const idNum = Number(a?.Asignatura_Id);
+    if (!idNum || isNaN(idNum) || vistos.has(idNum)) {
+      maxId += 1;
+      vistos.add(maxId);
+      return { ...a, Asignatura_Id: maxId };
+    }
+    vistos.add(idNum);
+    return { ...a, Asignatura_Id: idNum };
+  });
+};
 
 const BADGE_PRIORIDAD = {
   Alta:  { background: "#fee2e2", color: "#b91c1c" },
@@ -89,23 +109,23 @@ function Asignaturas() {
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
   const esAdmin = esSuperAdmin || rol === "Administrador" || usuario?.roles?.includes("Administrador") || true;
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setCargando(true);
     try {
       const res = await fetch("/api/planes/asignaturas", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (res.ok) setAsignaturas(data);
+      if (res.ok) setAsignaturas(deduplicarAsignaturas(data));
       else setError(data.error || "Error al cargar asignaturas");
     } catch {
       setError("Error al conectar con el servidor");
     } finally {
       setCargando(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { Promise.resolve().then(() => cargar()); }, [cargar]);
 
   const mostrarExito = (msg) => {
     setExito(msg);
@@ -126,16 +146,9 @@ function Asignaturas() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setAsignaturas((prev) => [
-          ...prev,
-          {
-            Asignatura_Id: data.id || Date.now(),
-            Asignatura_Nombre: nombre,
-            Asignatura_Prioridad_Academica: prioridad,
-          },
-        ]);
         mostrarExito(data.mensaje || "Asignatura registrada correctamente");
         setMostrarForm(false);
+        await cargar();
       } else {
         setError(data.error || "Error al registrar asignatura");
       }
@@ -160,15 +173,9 @@ function Asignaturas() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setAsignaturas((prev) =>
-          prev.map((a) =>
-            a.Asignatura_Id === editando.id
-              ? { ...a, Asignatura_Nombre: nombre, Asignatura_Prioridad_Academica: prioridad }
-              : a
-          )
-        );
         mostrarExito(data.mensaje || "Cambios guardados correctamente");
         setEditando(null);
+        await cargar();
       } else {
         setError(data.error || "Error al actualizar asignatura");
       }
@@ -240,6 +247,7 @@ function Asignaturas() {
         <div className="form-card" style={{ borderLeft: "3px solid #2563eb" }}>
           <h2>Editar Asignatura</h2>
           <FormAsignatura
+            key={`editando-${editando.id}`}
             inicial={editando}
             onGuardar={handleEditar}
             onCancelar={cancelarEdicion}
@@ -280,7 +288,7 @@ function Asignaturas() {
           </thead>
           <tbody>
             {filtradas.map((a, i) => (
-              <tr key={a.Asignatura_Id} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
+              <tr key={`asig-${a.Asignatura_Id}-${i}`} style={editando?.id === a.Asignatura_Id ? { background: "#eff6ff" } : {}}>
                 <td style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{i + 1}</td>
                 <td style={{ fontWeight: 500 }}>{a.Asignatura_Nombre}</td>
                 <td><BadgePrioridad valor={a.Asignatura_Prioridad_Academica} /></td>

@@ -44,7 +44,7 @@ function ResetPassword() {
   };
 
   useEffect(() => {
-    validarToken();
+    Promise.resolve().then(() => validarToken());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 

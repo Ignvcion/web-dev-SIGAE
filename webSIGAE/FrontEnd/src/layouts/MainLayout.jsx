@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../pages/context/AuthContext";
 import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
@@ -9,17 +9,15 @@ function MainLayout() {
   const location = useLocation();
 
   // Sidebar responsiva: en pantallas angostas se comporta como panel deslizable
-  const [sidebarMovilAbierta, setSidebarMovilAbierta] = useState(false);
+  // La sidebar móvil queda abierta solo en la página donde se abrió: al navegar a otra se cierra sola.
+  const [sidebarAbiertaEn, setSidebarAbiertaEn] = useState(null);
+  const sidebarMovilAbierta = sidebarAbiertaEn === location.pathname;
+  const setSidebarMovilAbierta = (abierta) => setSidebarAbiertaEn(abierta ? location.pathname : null);
 
   // Estados para los dropdowns
   const [gestionAbierto, setGestionAbierto] = useState(false);
   const [registrarAbierto, setRegistrarAbierto] = useState(false);
   const [gestionAcademicaAbierto, setGestionAcademicaAbierto] = useState(false);
-
-  // Cierra la sidebar móvil automáticamente al navegar a otra página
-  useEffect(() => {
-    setSidebarMovilAbierta(false);
-  }, [location.pathname]);
 
   const rolEfectivo = rolActivo || usuario?.roles?.[0];
   const esSuperAdmin = usuario?.administradorTipo === "Super Admin";
@@ -48,17 +46,11 @@ function MainLayout() {
           ☰
         </button>
 
-        <div className="mobile-topbar-brand">
-          <img
-            src={`${import.meta.env.BASE_URL}logo-colegio.png`}
-            alt="Logo Colegio Jacques Cousteau"
-            className="mobile-topbar-logo"
-          />
-          <div className="mobile-topbar-titles">
-            <span className="mobile-topbar-name">Colegio Jacques Cousteau</span>
-            <span className="mobile-topbar-sub">SIGAE</span>
-          </div>
-        </div>
+        <img
+          src={`${import.meta.env.BASE_URL}logo-colegio.png`}
+          alt="Logo Colegio Jacques Cousteau"
+          className="mobile-topbar-logo"
+        />
       </header>
 
       {/* Fondo oscuro al abrir la sidebar en móvil */}

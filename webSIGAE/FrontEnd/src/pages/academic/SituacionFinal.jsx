@@ -196,10 +196,10 @@ function SituacionFinal() {
         <>
           <div className="form-card">
             <p style={{ margin: 0 }}>
-              <strong>{datos.curso.Curso_Nombre}</strong> · período {datos.periodo} ·{" "}
-              {datos.resumen.total} estudiante(s): {datos.resumen.sinSituacion} sin situación,{" "}
-              {datos.resumen.borrador} en borrador, {datos.resumen.registrado} registradas,{" "}
-              {datos.resumen.aplicado} aplicadas
+              <strong>{datos.curso?.Curso_Nombre}</strong> · período {datos.periodo} ·{" "}
+              {datos.resumen?.total ?? 0} estudiante(s): {datos.resumen?.sinSituacion ?? 0} sin situación,{" "}
+              {datos.resumen?.borrador ?? 0} en borrador, {datos.resumen?.registrado ?? 0} registradas,{" "}
+              {datos.resumen?.aplicado ?? 0} aplicadas
             </p>
             {!datos.cierreIniciado && (
               <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>

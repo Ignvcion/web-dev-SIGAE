@@ -4,13 +4,17 @@ import {
   cancelarCitacion,
   confirmarCitacion,
   getDetalleCitacion,
+  habilitarRespuestasCitacion,
   reprogramarCitacion,
 } from "../../services/api";
 import {
   MAX_MOTIVO,
   TRAMOS_HORARIOS,
+  descripcionEstadoDetalle,
   esCancelada,
   esEditable,
+  esPendiente,
+  esTramoPasadoHoy,
   fechaISO,
   formatearFecha,
   hoyISO,
@@ -37,6 +41,22 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
   const [errorMotivo, setErrorMotivo] = useState("");
 
   const [reprog, setReprog] = useState({ fecha: "", tramo: "" });
+  const [msgRespuestas, setMsgRespuestas] = useState("");
+
+  // RF54 / CU86: el docente habilita que el apoderado le responda hasta el término de la reunión
+  const handleHabilitarRespuestas = async () => {
+    setProcesando(true);
+    setMsgError("");
+    setMsgRespuestas("");
+    try {
+      const data = await habilitarRespuestasCitacion(citacion.Citacion_Id);
+      setMsgRespuestas(data.mensaje);
+    } catch (error) {
+      setMsgError(error.message || "No fue posible habilitar las respuestas del apoderado");
+    } finally {
+      setProcesando(false);
+    }
+  };
   const [erroresReprog, setErroresReprog] = useState({});
 
   // CU76/CU77 pasos 4–10: getDetalleCitacion(Citacion_Id)
@@ -62,9 +82,8 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
     setMsgError("");
   };
 
-  // CU75: confirmar citación pendiente
+  // CU75: confirmar citación pendiente sin diálogo nativo window.confirm (compatible con PWA/WebView móvil)
   const handleConfirmar = async () => {
-    if (!window.confirm("¿Confirmas tu asistencia a esta citación?")) return;
     setProcesando(true);
     setMsgError("");
     try {
@@ -173,9 +192,43 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
 
         {!cargando && citacion && vista === "detalle" && (
           <>
+            {puedeConfirmar(citacion, rol) && esEditable(citacion) && (
+              <div className="cit-banner-confirmar">
+                <div className="cit-banner-confirmar-info">
+                  <strong>Solicitud pendiente de tu confirmación</strong>
+                  <p>Confirma tu asistencia para fijar la reunión en la agenda escolar.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-reactivar btn-confirmar-destacado"
+                  onClick={handleConfirmar}
+                  disabled={procesando}
+                >
+                  {procesando ? "Confirmando..." : "✓ Confirmar citación"}
+                </button>
+              </div>
+            )}
+
+            {esPendiente(citacion) && !puedeConfirmar(citacion, rol) && esEditable(citacion) && (
+              <div className="cit-aviso-contraparte">
+                <strong>⏳ Esperando confirmación de la contraparte</strong>
+                <p>
+                  Esta citación requiere la confirmación del{" "}
+                  {citacion.Requiere_Confirmacion_De === "Docente" ? "docente" : "apoderado"}{" "}
+                  (<strong>{citacion.Requiere_Confirmacion_De === "Docente" ? citacion.Docente_Nombre || "Docente asignado" : citacion.Apoderado_Nombre || "Apoderado"}</strong>).
+                  Por seguridad institucional (CU75), la asistencia debe ser confirmada directamente por la persona citada desde su cuenta de usuario.
+                </p>
+              </div>
+            )}
+
             <dl className="cit-detalle">
               <dt>Estado</dt>
-              <dd><EstadoCitacionBadge citacion={citacion} /> <span className="cit-estado-raw">{citacion.Citacion_Estado}</span></dd>
+              <dd>
+                <EstadoCitacionBadge citacion={citacion} />
+                {descripcionEstadoDetalle(citacion) && (
+                  <span className="cit-estado-raw">{descripcionEstadoDetalle(citacion)}</span>
+                )}
+              </dd>
               <dt>Fecha</dt>
               <dd>{formatearFecha(citacion.Citacion_Fecha)}</dd>
               <dt>Tramo horario</dt>
@@ -214,20 +267,32 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
               <p className="cit-nota">
                 {esCancelada(citacion)
                   ? "La citación está cancelada y no admite modificaciones."
-                  : "La fecha de esta citación ya pasó; no está disponible para edición."}
+                  : "La fecha y horario de esta citación ya pasaron; no está disponible para edición."}
               </p>
             )}
 
             {msgError && <div className="msg-error-form">{msgError}</div>}
+            {msgRespuestas && <div className="msg-exito" role="status">{msgRespuestas}</div>}
 
             <div className="cit-acciones-detalle">
               <Link className="cit-link" to={`/citaciones/historial?estudiante=${citacion.Estudiante_Id}`}>
                 Ver historial del estudiante
               </Link>
               <div className="acciones-grupo">
-                {puedeConfirmar(citacion, rol) && fechaISO(citacion.Citacion_Fecha) >= hoyISO() && (
+                {puedeConfirmar(citacion, rol) && esEditable(citacion) && (
                   <button type="button" className="btn-reactivar" onClick={handleConfirmar} disabled={procesando}>
                     {procesando ? "Confirmando..." : "Confirmar citación"}
+                  </button>
+                )}
+                {rol === "Docente" && esEditable(citacion) && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleHabilitarRespuestas}
+                    disabled={procesando}
+                    title="Aunque tu recepción de mensajes esté deshabilitada, el apoderado podrá responderte hasta que termine la reunión"
+                  >
+                    Habilitar respuestas hasta la reunión
                   </button>
                 )}
                 {esEditable(citacion) && (
@@ -296,7 +361,12 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                   min={hoyISO()}
                   value={reprog.fecha}
                   onChange={(e) => {
-                    setReprog((r) => ({ ...r, fecha: e.target.value }));
+                    const nuevaFecha = e.target.value;
+                    setReprog((r) => ({
+                      ...r,
+                      fecha: nuevaFecha,
+                      tramo: r.tramo && esTramoPasadoHoy(nuevaFecha, r.tramo) ? "" : r.tramo,
+                    }));
                     setErroresReprog((er) => ({ ...er, fecha: undefined }));
                     setMsgError("");
                   }}
@@ -316,9 +386,14 @@ function DetalleCitacionModal({ citacionId, rol, onClose, onActualizada }) {
                   }}
                 >
                   <option value="">Selecciona un tramo...</option>
-                  {TRAMOS_HORARIOS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+                  {TRAMOS_HORARIOS.map((t) => {
+                    const pasado = esTramoPasadoHoy(reprog.fecha, t);
+                    return (
+                      <option key={t} value={t} disabled={pasado}>
+                        {pasado ? `${t} (pasado)` : t}
+                      </option>
+                    );
+                  })}
                 </select>
                 {erroresReprog.tramo && <span className="pwd-error">{erroresReprog.tramo}</span>}
               </div>
