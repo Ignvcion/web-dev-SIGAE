@@ -5,6 +5,7 @@ import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
 import { etiquetaRol, enlacesUTP, tieneUTPActiva, esAdministradorUTP } from "../utils/permisos";
 import CampanaNotificaciones from "../components/CampanaNotificaciones";
 import InvitacionInstalarApp, { BotonInstalarApp } from "../components/pwa/InstalarApp";
+import BotonTema from "../components/tema/BotonTema";
 
 function MainLayout() {
   const { usuario, rolActivo, logout } = useAuth();
@@ -389,6 +390,7 @@ function MainLayout() {
                 </Link>
               </>
             )}
+            <BotonTema />
             <BotonInstalarApp />
           </nav>
         </div>

@@ -5,6 +5,7 @@ import { validarRut, normalizarRut } from "../../utils/validaciones";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
 import { apiUrl } from "../../services/api";
+import BotonTema from "../../components/tema/BotonTema";
 
 const ESPERA_ENTRE_ENVIOS = 60;
 
@@ -174,6 +175,7 @@ function Login() {
   if (paso === "codigo") {
     return (
       <div className="login-container">
+        <BotonTema variante="flotante" />
         <form className="login-form" onSubmit={handleVerificar}>
           <div className="login-logo">
             <img src={`${import.meta.env.BASE_URL}logo-colegio.png`} alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
@@ -212,6 +214,7 @@ function Login() {
 
   return (
     <div className="login-container">
+      <BotonTema variante="flotante" />
       <form className="login-form" onSubmit={handleSubmit}>
 
         <div className="login-logo">

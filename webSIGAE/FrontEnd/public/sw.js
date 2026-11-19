@@ -1,6 +1,8 @@
-const CACHE_NAME = 'sigae-pwa-v4';
+const CACHE_NAME = 'sigae-pwa-v5';
 const PRECACHE_ASSETS = [
   './manifest.json',
+  './tema-inicial.js',
+  './restaurar-ruta.js',
   './favicon.png',
   './favicon-32x32.png',
   './logo-colegio.png',

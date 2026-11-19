@@ -4,8 +4,12 @@ import App from "./App";
 
 import { AuthProvider } from "./pages/context/AuthContext";
 import { iniciarPWA } from "./utils/pwa";
+import { iniciarTema } from "./utils/tema";
 
 import "./index.css";
+
+// Modo oscuro: antes de dibujar la app, con las hojas de estilo ya cargadas
+iniciarTema();
 
 ReactDOM.createRoot(
   document.getElementById("root")
