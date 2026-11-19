@@ -300,7 +300,17 @@ Para detenerlo, cierra las dos ventanas. Si no cambiaste el FrontEnd, puedes sal
 2. Copia `webSIGAE/tunel.config.example` como `webSIGAE/tunel.config` y pon tu dominio gratuito de ngrok en `NGROK_DOMINIO` (está en *Domains*).
 3. La primera vez, ejecuta en PowerShell `ngrok config add-authtoken TU_TOKEN` (el token está en *Your Authtoken*). Si aún no tienes ngrok, `iniciar-sigae.bat` lo instala.
 
-> La app solo está disponible mientras tu computador esté encendido, sin suspenderse y con las dos ventanas abiertas. `tunel.config` no se sube a git.
+> La app solo está disponible mientras tu computador esté encendido y con las dos ventanas abiertas. `tunel.config` no se sube a git.
+
+**SIGAE siempre encendido.** Para que SIGAE y el túnel arranquen solos con Windows y se levanten de nuevo si se caen, haz doble clic en **`webSIGAE/instalar-sigae-siempre.bat`** (pide permisos de administrador). Ese instalador:
+
+- crea la tarea programada **SIGAE**, que al entrar a Windows inicia un vigilante en segundo plano (`sigae-siempre.ps1`). El vigilante revisa cada 15 segundos que el backend responda y cada 2 minutos que la dirección pública funcione, y reinicia lo que falle;
+- deja MySQL con inicio automático y configura Windows para no suspenderse ni hibernar mientras esté enchufado;
+- compila la app y la inicia de inmediato.
+
+Usa `webSIGAE/ver-sigae.bat` para ver la dirección y los últimos eventos, y `webSIGAE/quitar-sigae-siempre.bat` para desactivarlo. Los registros quedan en `webSIGAE/logs/` (fuera de git). Si cambias el FrontEnd, vuelve a ejecutar el instalador para recompilar.
+
+> Usa ngrok (dirección fija): con Cloudflare la dirección cambia cada vez que el túnel se reinicia. SIGAE no puede funcionar con el computador apagado, sin internet o antes de iniciar sesión en Windows.
 
 ## 📦 Deploy
 
