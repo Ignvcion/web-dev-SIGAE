@@ -122,6 +122,21 @@ describe('createUsuario: contraseña inicial aleatoria enviada por correo', () =
     expect(conn.commit).not.toHaveBeenCalled();
   });
 
+  test('sin correo configurado (fuera de producción) devuelve la contraseña para mostrarla', async () => {
+    simularBase();
+    mailer.correoConfigurado.mockReturnValue(false);
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    const res = nuevoRes();
+    await usuarioController.createUsuario({ body: { ...apoderado }, user: SUPER_ADMIN }, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(mailer.enviarContrasenaInicial).not.toHaveBeenCalled();
+    const respuesta = res.json.mock.calls[0][0];
+    expect(respuesta.Contrasena_Inicial).toHaveLength(12);
+    expect(await bcrypt.compare(respuesta.Contrasena_Inicial, insercion[4])).toBe(true);
+    expect(respuesta).not.toHaveProperty('Contrasena_Enviada_A');
+  });
+
   test('guarda el teléfono sin espacios', async () => {
     simularBase();
     const res = nuevoRes();

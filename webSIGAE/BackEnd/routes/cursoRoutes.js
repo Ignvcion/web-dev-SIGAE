@@ -1,8 +1,10 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { getCursos, getNiveles, crearCurso, getAsignaturasDeCurso, getAsignaturasDisponibles, asignarAsignaturas } = require('../controllers/cursoController');
 const { designarProfesorJefe, retirarProfesorJefe, getEstudiantesDeCurso, getMisJefaturas, asignarRutaFormacion } = require('../controllers/profesorJefeController');
 const { verifyToken, verifyAdmin, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 router.get('/', verifyToken, getCursos);
 router.get('/niveles', verifyToken, getNiveles);

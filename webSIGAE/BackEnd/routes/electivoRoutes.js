@@ -3,6 +3,7 @@
 // compartidos (CU106). La gestión es del Administrador, el Super Administrador y la etiqueta UTP; los
 // electivos se ven además en los horarios del curso, del docente y del estudiante.
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getPlan,
@@ -16,6 +17,7 @@ const {
 } = require('../controllers/electivoController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // Administración y etiqueta UTP (utils/permisos.js)
 router.use(verifyToken, verifyGestionAcademica);

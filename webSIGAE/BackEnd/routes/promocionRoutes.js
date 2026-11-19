@@ -1,12 +1,14 @@
 // RF61: situación final, promoción y cambio de período lectivo.
 // docs/decisiones-rf60-rf61-periodos.txt (puntos 4 a 6).
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const multer = require('multer');
 const { verifyToken, verifyAdmin, verifyGestionAcademica, verifySuperAdmin } = require('../middleware/authMiddleware');
 const promocion = require('../controllers/promocionController');
 const periodo = require('../controllers/periodoController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // CU99: el Excel se procesa en memoria (no se guarda en disco); máximo 2 MB
 const subirExcel = multer({

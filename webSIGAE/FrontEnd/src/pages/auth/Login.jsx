@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { validarRut, normalizarRut } from "../../utils/validaciones";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
@@ -38,7 +38,11 @@ function Login() {
   const [espera, setEspera] = useEspera();
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, usuario, token } = useAuth();
+  // Si al abrir esta página ya había una sesión, se va directo al panel (por ejemplo, al
+  // escribir la dirección de SIGAE o abrir un enlace viejo). Solo cuenta la sesión previa:
+  // justo después de iniciar sesión, entrar() decide adónde ir (p. ej. elegir el perfil).
+  const [sesionPrevia] = useState(() => Boolean(usuario && token));
 
   const entrar = (user, token) => {
     login(user, token);
@@ -171,6 +175,10 @@ function Login() {
       setReenviando(false);
     }
   };
+
+  if (sesionPrevia) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (paso === "codigo") {
     return (

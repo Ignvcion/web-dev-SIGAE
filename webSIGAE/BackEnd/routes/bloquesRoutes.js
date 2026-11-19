@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken, verifyAdmin, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getParametros, updateParametros,
@@ -11,6 +12,7 @@ const {
 } = require('../controllers/conflictosHorarioController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 router.use(verifyToken);
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getPlanes,
@@ -13,6 +14,7 @@ const {
 } = require('../controllers/planController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // Asignaturas y planes educativos: administración y etiqueta UTP (utils/permisos.js)
 router.use(verifyToken);

@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken } = require('../middleware/authMiddleware');
 const {
   getCitaciones,
@@ -20,6 +21,7 @@ const {
 const { getContactosApoderados } = require('../controllers/apoderadosEstudianteController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // Todos los endpoints requieren autenticación; la autorización por rol y por
 // participación en la citación se resuelve dentro del controlador.

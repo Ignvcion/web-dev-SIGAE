@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken } = require('../middleware/authMiddleware');
 const {
   getMisAsignaciones,
@@ -9,6 +10,7 @@ const {
 } = require('../controllers/evaluacionController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // RF58 / RF59: los roles se validan dentro del controlador según el rol activo.
 router.use(verifyToken);

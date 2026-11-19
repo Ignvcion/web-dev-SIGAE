@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { login, logout, verificarActivacion, reenviarActivacion } = require('../controllers/authController');
 const {
   checkRecoveryEmails,
@@ -11,6 +12,7 @@ const { loginLimiter, recoveryLimiter, codigoLimiter } = require('../middleware/
 const { verifyToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // Autenticación
 router.post('/login', loginLimiter, validateLogin, login);

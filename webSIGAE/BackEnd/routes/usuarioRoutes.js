@@ -1,6 +1,8 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const disponibilidadLaboral = require('../controllers/disponibilidadLaboralController');
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 const usuarioController = require('../controllers/usuarioController');
 const pie = require('../controllers/pieController');

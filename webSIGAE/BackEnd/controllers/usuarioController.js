@@ -598,6 +598,7 @@ const createUsuario = async (req, res) => {
     let guardadoDisponibilidad = null;
     // El docente nuevo recibe un color aleatorio que lo identifica (se cambia en Docentes)
     const colorDocente = Es_Docente ? await colorAleatorioDocente(db) : null;
+    let contrasenaVisible = null; // solo sin correo configurado (ver utils/contrasenaInicial.js)
     const nuevoId = await enTransaccion(async (conn) => {
       const [resultado] = await conn.query(
         `INSERT INTO usuario (
@@ -644,12 +645,13 @@ const createUsuario = async (req, res) => {
       }
       // Último paso antes del commit: si el correo no sale, la cuenta no se crea
       // (nadie conocería su contraseña).
-      await entregarContrasenaInicial({
+      const entrega = await entregarContrasenaInicial({
         para: correoDestino,
         nombre: Usuario_Nombre_Completo.trim(),
         rut: Usuario_RUT,
         contrasena: contrasenaInicial,
       });
+      contrasenaVisible = entrega?.contrasenaVisible || null;
       return resultado.insertId;
     });
 
@@ -657,7 +659,10 @@ const createUsuario = async (req, res) => {
     const { Usuario_Contraseña: pwd, ...usuarioSinPwd } = nuevo[0];
     const respuesta = {
       ...usuarioSinPwd,
-      Contrasena_Enviada_A: enmascararCorreo(correoDestino),
+      // Sin correo configurado la contraseña no se envía: se muestra al administrador
+      ...(contrasenaVisible
+        ? { Contrasena_Inicial: contrasenaVisible }
+        : { Contrasena_Enviada_A: enmascararCorreo(correoDestino) }),
       Aviso_Estado: 'La cuenta figura como inactiva hasta el primer inicio de sesión del usuario.',
     };
     res.status(201).json(guardadoDisponibilidad

@@ -51,7 +51,7 @@ async function entregarContrasenaInicial({ para, nombre, rut, contrasena }) {
   if (correoConfigurado()) {
     try {
       await enviarContrasenaInicial({ para, nombre, rut, contrasena });
-      return;
+      return {};
     } catch (errorEnvio) {
       console.error('contrasenaInicial: falló el envío del correo:', errorEnvio.message);
       throw new ErrorEnvioContrasena(
@@ -64,6 +64,9 @@ async function entregarContrasenaInicial({ para, nombre, rut, contrasena }) {
     throw new ErrorEnvioContrasena('El envío de correos no está disponible: el usuario no se registró.');
   }
   console.log(`[dev] Contraseña inicial para ${para} (RUT ${rut}): ${contrasena} (SMTP no configurado)`);
+  // Sin correo (desarrollo o una instalación de prueba en la nube) nadie más vería la
+  // contraseña: se devuelve para mostrarla al administrador, como los códigos de verificación.
+  return { contrasenaVisible: contrasena };
 }
 
 module.exports = {

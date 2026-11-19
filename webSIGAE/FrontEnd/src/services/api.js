@@ -151,10 +151,13 @@ function columnasDireccionUsuario({ calle, numero, depto, comuna }) {
 
 // La contraseña inicial la genera el backend y la envía al correo del usuario.
 // La cuenta queda inactiva hasta el primer inicio de sesión del usuario.
+// Sin correo configurado (instalación de prueba), el backend devuelve la contraseña para entregarla a mano.
 export function textoContrasenaEnviada(creado) {
-  const contrasena = creado?.Contrasena_Enviada_A
-    ? `La contraseña se envió a ${creado.Contrasena_Enviada_A}.`
-    : "La contraseña se envió al correo del usuario.";
+  const contrasena = creado?.Contrasena_Inicial
+    ? `El envío de correos no está configurado. Contraseña inicial: ${creado.Contrasena_Inicial}\nEntrégasela al usuario; podrá cambiarla desde "Mi Perfil".`
+    : creado?.Contrasena_Enviada_A
+      ? `La contraseña se envió a ${creado.Contrasena_Enviada_A}.`
+      : "La contraseña se envió al correo del usuario.";
   const estado = creado?.Aviso_Estado || "La cuenta figura como inactiva hasta el primer inicio de sesión del usuario.";
   return `${contrasena}\n\n${estado}`;
 }

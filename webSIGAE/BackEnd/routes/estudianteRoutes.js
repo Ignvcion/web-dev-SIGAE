@@ -1,5 +1,7 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const router  = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 const estudianteController = require('../controllers/estudianteController');
 const apoderadosEstudianteController = require('../controllers/apoderadosEstudianteController');

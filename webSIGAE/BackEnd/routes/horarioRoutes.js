@@ -1,4 +1,5 @@
 const express = require('express');
+const { validarIdsNumericos } = require('../middleware/validarIds');
 const { verifyToken, verifyGestionAcademica } = require('../middleware/authMiddleware');
 const {
   getHorarios,
@@ -38,6 +39,7 @@ const {
 } = require('../controllers/exportController');
 
 const router = express.Router();
+validarIdsNumericos(router); // 400 si un :id no es numérico (ver middleware/validarIds.js)
 
 // Todos los endpoints requieren autenticación
 // Horarios: la escritura, las consultas globales y las suspensiones son de la
