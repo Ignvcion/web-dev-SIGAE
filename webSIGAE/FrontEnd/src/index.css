@@ -7,8 +7,22 @@ html, body {
   padding: 0;
 }
 
+html {
+  /* Evita que el celular agrande el texto por su cuenta al girar la pantalla */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: #f3f4f6;
+  /* Fuente del sistema (la del celular o computador): sin ella el navegador usaba Times New Roman */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Los controles de formulario no heredan la fuente por defecto */
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 input[type="file"] {
