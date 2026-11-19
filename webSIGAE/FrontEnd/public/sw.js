@@ -1,10 +1,14 @@
-const CACHE_NAME = 'sigae-pwa-v3';
+const CACHE_NAME = 'sigae-pwa-v4';
 const PRECACHE_ASSETS = [
   './manifest.json',
-  './favicon.svg',
+  './favicon.png',
+  './favicon-32x32.png',
   './logo-colegio.png',
   './icons/icon-192x192.png',
   './icons/icon-512x512.png',
+  './icons/icon-maskable-192x192.png',
+  './icons/icon-maskable-512x512.png',
+  './icons/apple-touch-icon-180x180.png',
 ];
 
 // Instalación: precachear recursos estáticos mínimos de la shell

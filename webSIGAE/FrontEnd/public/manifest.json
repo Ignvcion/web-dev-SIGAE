@@ -1,24 +1,77 @@
 {
-  "short_name": "SIGAE",
+  "id": "./",
   "name": "SIGAE - Sistema de Gestión Académica Escolar",
-  "description": "Sistema de Gestión Académica Escolar",
+  "short_name": "SIGAE",
+  "description": "Gestión académica del Colegio Jacques Cousteau: citaciones, horarios, mensajes y más.",
+  "lang": "es-CL",
+  "dir": "ltr",
+  "start_url": "./dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1e40af",
+  "background_color": "#f3f4f6",
+  "categories": [
+    "education",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "./icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "theme_color": "#1e40af",
-  "background_color": "#f3f4f6"
+  "shortcuts": [
+    {
+      "name": "Inicio",
+      "url": "./dashboard",
+      "icons": [
+        {
+          "src": "./icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Citaciones",
+      "url": "./citaciones",
+      "icons": [
+        {
+          "src": "./icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Calendario de evaluaciones",
+      "short_name": "Evaluaciones",
+      "url": "./calendario-evaluaciones",
+      "icons": [
+        {
+          "src": "./icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }

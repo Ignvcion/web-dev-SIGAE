@@ -175,7 +175,7 @@ function Login() {
       <div className="login-container">
         <form className="login-form" onSubmit={handleVerificar}>
           <div className="login-logo">
-            <img src="/logo-colegio.png" alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
+            <img src={`${import.meta.env.BASE_URL}logo-colegio.png`} alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
             <p>Activa tu cuenta</p>
           </div>
 
@@ -214,7 +214,7 @@ function Login() {
       <form className="login-form" onSubmit={handleSubmit}>
 
         <div className="login-logo">
-          <img src="/logo-colegio.png" alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
+          <img src={`${import.meta.env.BASE_URL}logo-colegio.png`} alt="Logo Colegio Jacques Cousteau" className="login-logo-img" />
           <p>Sistema de Gestión Académica Escolar</p>
         </div>
 

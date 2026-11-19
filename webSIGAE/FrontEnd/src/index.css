@@ -539,8 +539,8 @@ select {
     top: 0;
     left: 0;
     right: 0;
-    height: 56px;
-    padding: 0 16px;
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 16px 0;
     background: #0f172a;
     z-index: 999;
   }
@@ -567,6 +567,8 @@ select {
     height: 100vh;
     width: 280px;
     max-width: 85vw;
+    padding-top: calc(25px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(25px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     z-index: 1001;
@@ -590,7 +592,7 @@ select {
 
   .main-content {
     padding: 16px;
-    padding-top: 72px; /* deja espacio para la barra superior fija */
+    padding-top: calc(72px + env(safe-area-inset-top, 0px)); /* deja espacio para la barra superior fija */
   }
 
   .tabla-usuarios {
@@ -603,7 +605,7 @@ select {
 @media (max-width: 480px) {
   .main-content {
     padding: 12px;
-    padding-top: 68px;
+    padding-top: calc(68px + env(safe-area-inset-top, 0px));
   }
 }
 

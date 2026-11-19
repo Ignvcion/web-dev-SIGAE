@@ -31,6 +31,17 @@ export function appPath(path = '') {
   return `${base}${String(path).replace(/^\/+/, '')}`;
 }
 
+// Sin conexión, fetch falla con "Failed to fetch": se cambia por un mensaje que el usuario entienda
+const MENSAJE_SIN_CONEXION = 'Sin conexión a internet. Revisa tu conexión e inténtalo de nuevo.';
+const MENSAJE_SIN_SERVIDOR = 'No fue posible conectar con el servidor. Inténtalo de nuevo en unos minutos.';
+
+function pedir(url, opciones) {
+  return fetch(url, opciones).catch((error) => {
+    if (error?.name === 'AbortError') throw error;
+    throw new Error(navigator.onLine === false ? MENSAJE_SIN_CONEXION : MENSAJE_SIN_SERVIDOR);
+  });
+}
+
 function getToken() {
   return localStorage.getItem('token');
 }
@@ -51,7 +62,7 @@ function clearSessionAndRedirect() {
 
 export async function apiFetch(url, options = {}) {
   const token = getToken();
-  const res = await fetch(apiUrl(url), {
+  const res = await pedir(apiUrl(url), {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -95,7 +106,7 @@ throw error;
 
 // nombre y rut: solo el Super Administrador puede corregirlos en su propio perfil
 export async function editarPerfilPropio({ correo, telefono, direccion, nombre, rut }) {
-  const res = await fetch(`${BASE_URL}/usuarios/perfil`, {
+  const res = await pedir(`${BASE_URL}/usuarios/perfil`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ correo, telefono, direccion, nombre, rut }),
@@ -105,7 +116,7 @@ export async function editarPerfilPropio({ correo, telefono, direccion, nombre, 
 
 // CU19: confirmar el correo nuevo con el código enviado a esa dirección
 export async function confirmarCorreoPropio(codigo) {
-  const res = await fetch(`${BASE_URL}/usuarios/perfil/correo`, {
+  const res = await pedir(`${BASE_URL}/usuarios/perfil/correo`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ codigo }),
@@ -118,7 +129,7 @@ export async function confirmarCorreoPropio(codigo) {
 export async function actualizarFotoPerfil(archivo) {
   const formData = new FormData();
   formData.append('foto', archivo);
-  const res = await fetch(`${BASE_URL}/usuarios/perfil/foto`, {
+  const res = await pedir(`${BASE_URL}/usuarios/perfil/foto`, {
     method : 'PUT',
     // Sin Content-Type: el navegador arma el boundary multipart automáticamente
     headers: { Authorization: `Bearer ${getToken()}` },
@@ -154,7 +165,7 @@ const quitarEspacios = (texto) => String(texto ?? "").replace(/\s+/g, "");
 // ── ADMINISTRADOR ────────────────────────────
 // La cuenta se registra inactiva hasta el primer inicio de sesión: el formulario no elige el estado
 export async function registrarAdmin({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
-  const res = await fetch(`${BASE_URL}/usuarios`, {
+  const res = await pedir(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -174,7 +185,7 @@ export async function registrarAdmin({ nombre, rut, correo, telefono, calle, num
 
 // ── DOCENTE ──────────────────────────────────
 export async function registrarDocente({ nombre, rut, correo, telefono, especialidades, cargaHoraria, horasPIE, disponibilidad, horarioAtencion, calle, numero, depto, comuna }) {
-  const res = await fetch(`${BASE_URL}/usuarios`, {
+  const res = await pedir(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -198,7 +209,7 @@ export async function registrarDocente({ nombre, rut, correo, telefono, especial
 
 // ── APODERADO ────────────────────────────────
 export async function registrarApoderado({ nombre, rut, correo, telefono, calle, numero, depto, comuna }) {
-  const res = await fetch(`${BASE_URL}/usuarios`, {
+  const res = await pedir(`${BASE_URL}/usuarios`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -217,14 +228,14 @@ export async function registrarApoderado({ nombre, rut, correo, telefono, calle,
 
 // ── ESTUDIANTE ───────────────────────────────
 export async function verificarRutEstudiante(rut) {
-  const res = await fetch(`${BASE_URL}/estudiantes/verificar-rut?rut=${encodeURIComponent(rut)}`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/verificar-rut?rut=${encodeURIComponent(rut)}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
 }
 
 export async function registrarEstudiante({ nombre, rut, curso, estadoAcademico, calle, numero, depto, comuna }) {
-  const res = await fetch(`${BASE_URL}/estudiantes`, {
+  const res = await pedir(`${BASE_URL}/estudiantes`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -249,7 +260,7 @@ export async function getEstudiantes({ curso, estado } = {}) {
   if (curso) params.set('curso', curso);
   if (estado) params.set('estado', estado);
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/estudiantes${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/estudiantes${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -259,7 +270,7 @@ export async function getEstudiantes({ curso, estado } = {}) {
 
 export async function buscarEstudiantes(criterio) {
   const params = new URLSearchParams({ criterio: criterio ?? '' });
-  const res = await fetch(`${BASE_URL}/estudiantes/buscar?${params.toString()}`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/buscar?${params.toString()}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -268,14 +279,14 @@ export async function buscarEstudiantes(criterio) {
 // ── CU38: Editar curso asociado y estado académico de un estudiante ──
 
 export async function getCursos() {
-  const res = await fetch(`${BASE_URL}/cursos`, {
+  const res = await pedir(`${BASE_URL}/cursos`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
 }
 
 export async function editarEstudiante(id, datos) {
-  const res = await fetch(`${BASE_URL}/estudiantes/${id}`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/${id}`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify(datos),
@@ -290,7 +301,7 @@ export async function getUsuariosPorFiltro({ rol, estado } = {}) {
   if (rol) params.set('rol', rol);
   if (estado !== undefined && estado !== '') params.set('estado', estado);
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/usuarios/filtrar${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/usuarios/filtrar${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -304,7 +315,7 @@ export async function getDocentes({ especialidad, especialidadId, estado } = {})
   if (especialidadId) params.set('especialidadId', especialidadId);
   if (estado !== undefined && estado !== '') params.set('estado', estado);
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/usuarios/docentes${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/usuarios/docentes${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -312,13 +323,13 @@ export async function getDocentes({ especialidad, especialidadId, estado } = {})
 
 // ── RF04: catálogo de especialidades (etiquetas) ──
 export async function getEspecialidades() {
-  const res = await fetch(`${BASE_URL}/especialidades`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/especialidades`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // Reemplaza las especialidades (etiquetas) de un docente. Las nuevas se crean en el catálogo.
 export async function actualizarEspecialidadesDocente(usuarioId, especialidades) {
-  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}`, {
+  const res = await pedir(`${BASE_URL}/usuarios/${usuarioId}`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ Docente_Especialidades: especialidades }),
@@ -328,13 +339,13 @@ export async function actualizarEspecialidadesDocente(usuarioId, especialidades)
 
 // ── CU107: disponibilidad laboral semanal del docente (solo administrador) ──
 export async function getOpcionesDisponibilidad() {
-  const res = await fetch(`${BASE_URL}/usuarios/disponibilidad/opciones`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/usuarios/disponibilidad/opciones`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function getDisponibilidadDocente(usuarioId, periodo) {
   const query = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
-  const res = await fetch(`${BASE_URL}/usuarios/${usuarioId}/disponibilidad${query}`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/usuarios/${usuarioId}/disponibilidad${query}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -348,7 +359,7 @@ export async function getApoderados({ operador, cantidadEstudiantes } = {}) {
     if (operador) params.set('operador', operador);
   }
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/usuarios/apoderados${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/usuarios/apoderados${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -356,7 +367,7 @@ export async function getApoderados({ operador, cantidadEstudiantes } = {}) {
 
 // Obtener estudiantes que aún no tienen apoderado asignado
 export async function getEstudiantesSinApoderado() {
-  const res = await fetch(`${BASE_URL}/estudiantes/sin-apoderado`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/sin-apoderado`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -364,7 +375,7 @@ export async function getEstudiantesSinApoderado() {
 
 // Asignar apoderado a uno o más estudiantes
 export async function asignarApoderado({ apoderadoId, estudianteIds }) {
-  const res = await fetch(`${BASE_URL}/estudiantes/asignar-apoderado`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/asignar-apoderado`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({ apoderadoId, estudianteIds }),
@@ -374,7 +385,7 @@ export async function asignarApoderado({ apoderadoId, estudianteIds }) {
 
 // CU9: eliminar todas las asociaciones activas de un apoderado con sus estudiantes
 export async function eliminarTodasAsociaciones(apoderadoId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/todas`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/todas`, {
     method : 'DELETE',
     headers: authHeaders(),
   });
@@ -384,7 +395,7 @@ export async function eliminarTodasAsociaciones(apoderadoId) {
 
 // Obtener el listado de administradores registrados
 export async function getAdministradores() {
-  const res = await fetch(`${BASE_URL}/usuarios/administradores`, {
+  const res = await pedir(`${BASE_URL}/usuarios/administradores`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -392,7 +403,7 @@ export async function getAdministradores() {
 
 // Editar correo institucional, teléfono y/o estado de cuenta de un administrador
 export async function editarAdministrador(id, datos) {
-  const res = await fetch(`${BASE_URL}/usuarios/administradores/${id}`, {
+  const res = await pedir(`${BASE_URL}/usuarios/administradores/${id}`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify(datos),
@@ -404,14 +415,14 @@ export async function editarAdministrador(id, datos) {
 
 // "Mis Cursos": estudiantes de un curso donde el docente hace clases (sin RUT ni dirección)
 export async function getEstudiantesCursoDocente(cursoId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/curso/${cursoId}/mis-estudiantes`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/curso/${cursoId}/mis-estudiantes`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
 }
 
 export async function getAsignacionesDocente(docenteId) {
-  const res = await fetch(`${BASE_URL}/horarios/docente/${docenteId}/asignaciones`, {
+  const res = await pedir(`${BASE_URL}/horarios/docente/${docenteId}/asignaciones`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -420,7 +431,7 @@ export async function getAsignacionesDocente(docenteId) {
 // ── CU43: Horario semanal de un docente a partir de sus cursos asociados ──
 
 export async function getHorarioDocente(docenteId) {
-  const res = await fetch(`${BASE_URL}/horarios/docente/${docenteId}/horario`, {
+  const res = await pedir(`${BASE_URL}/horarios/docente/${docenteId}/horario`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -428,7 +439,7 @@ export async function getHorarioDocente(docenteId) {
 
 // Horario semanal del curso de un estudiante (su apoderado o un Administrador)
 export async function getHorarioEstudiante(estudianteId) {
-  const res = await fetch(`${BASE_URL}/horarios/estudiante/${estudianteId}/horario`, {
+  const res = await pedir(`${BASE_URL}/horarios/estudiante/${estudianteId}/horario`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -436,7 +447,7 @@ export async function getHorarioEstudiante(estudianteId) {
 
 // Listado simple de docentes activos, usado para el selector de "Mi Horario" (Admin/Super Admin)
 export async function getListaDocentes() {
-  const res = await fetch(`${BASE_URL}/horarios/docentes`, {
+  const res = await pedir(`${BASE_URL}/horarios/docentes`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -444,7 +455,7 @@ export async function getListaDocentes() {
 
 // CU57: vista consolidada del horario de toda la institución (Super Admin/Admin)
 export async function getHorarioMaestro() {
-  const res = await fetch(`${BASE_URL}/horarios/maestro`, {
+  const res = await pedir(`${BASE_URL}/horarios/maestro`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -453,7 +464,7 @@ export async function getHorarioMaestro() {
 // ── CU40: Estudiantes asociados a un apoderado ──
 
 export async function getEstudiantesAsociados(apoderadoId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/asociados`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/asociados`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -462,7 +473,7 @@ export async function getEstudiantesAsociados(apoderadoId) {
 // ── CU41: Detalle de un estudiante desde la lista de asociados ──
 
 export async function getDetalleEstudiante(apoderadoId, estudianteId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/asociados/${estudianteId}`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/apoderado/${apoderadoId}/asociados/${estudianteId}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -471,7 +482,7 @@ export async function getDetalleEstudiante(apoderadoId, estudianteId) {
 // ── CU39: Editar (reasignar/quitar) el apoderado de un estudiante ──
 
 export async function editarAsociacionEstudiante(estudianteId, apoderadoId, confirmarEliminacion = false) {
-  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderado`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/${estudianteId}/apoderado`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ apoderadoId, confirmarEliminacion }),
@@ -481,7 +492,7 @@ export async function editarAsociacionEstudiante(estudianteId, apoderadoId, conf
 
 // CU10: eliminar la asociación específica entre un apoderado y un estudiante
 export async function eliminarAsociacionEspecifica(estudianteId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderado`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/${estudianteId}/apoderado`, {
     method : 'DELETE',
     headers: authHeaders(),
   });
@@ -491,7 +502,7 @@ export async function eliminarAsociacionEspecifica(estudianteId) {
 // Buscar usuario existente por RUT, nombre o correo
 export async function buscarUsuarioExistente({ rut, nombre, correo }) {
 
-  const res = await fetch(
+  const res = await pedir(
     `${BASE_URL}/usuarios/buscar`,
     {
       method: "POST",
@@ -515,7 +526,7 @@ export async function getCitaciones(rol) {
   const params = new URLSearchParams();
   if (rol) params.set('rol', rol);
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/citaciones${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/citaciones${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -526,7 +537,7 @@ export async function getCitacionesPendientes(rol) {
   const params = new URLSearchParams();
   if (rol) params.set('rol', rol);
   const query = params.toString();
-  const res = await fetch(`${BASE_URL}/citaciones/pendientes${query ? `?${query}` : ''}`, {
+  const res = await pedir(`${BASE_URL}/citaciones/pendientes${query ? `?${query}` : ''}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -534,7 +545,7 @@ export async function getCitacionesPendientes(rol) {
 
 // CU76 / CU77: detalle de una citación (404 → "no existe o no está disponible")
 export async function getDetalleCitacion(citacionId) {
-  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}`, {
+  const res = await pedir(`${BASE_URL}/citaciones/${citacionId}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -542,7 +553,7 @@ export async function getDetalleCitacion(citacionId) {
 
 // CU74: crear citación (el backend valida disponibilidad y la registra "Pendiente de confirmación")
 export async function crearCitacion({ estudianteId, fecha, tramo, motivo, modalidad }) {
-  const res = await fetch(`${BASE_URL}/citaciones`, {
+  const res = await pedir(`${BASE_URL}/citaciones`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -558,7 +569,7 @@ export async function crearCitacion({ estudianteId, fecha, tramo, motivo, modali
 
 // CU75: confirmar citación pendiente (registra fecha y hora exacta de confirmación)
 export async function confirmarCitacion(citacionId) {
-  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/confirmar`, {
+  const res = await pedir(`${BASE_URL}/citaciones/${citacionId}/confirmar`, {
     method : 'PATCH',
     headers: authHeaders(),
   });
@@ -567,7 +578,7 @@ export async function confirmarCitacion(citacionId) {
 
 // CU76: cancelar citación con motivo obligatorio (queda registrado en el historial)
 export async function cancelarCitacion(citacionId, motivo) {
-  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/cancelar`, {
+  const res = await pedir(`${BASE_URL}/citaciones/${citacionId}/cancelar`, {
     method : 'PATCH',
     headers: authHeaders(),
     body   : JSON.stringify({ Citacion_Motivo_Cancelacion: motivo.trim() }),
@@ -577,7 +588,7 @@ export async function cancelarCitacion(citacionId, motivo) {
 
 // CU77: reprogramar fecha y/o tramo; la citación vuelve a "Pendiente de confirmación" para la contraparte
 export async function reprogramarCitacion(citacionId, { fecha, tramo }) {
-  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/reprogramar`, {
+  const res = await pedir(`${BASE_URL}/citaciones/${citacionId}/reprogramar`, {
     method : 'PATCH',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -590,7 +601,7 @@ export async function reprogramarCitacion(citacionId, { fecha, tramo }) {
 
 // CU79: historial completo de citaciones de un estudiante (con registros de la tabla historial)
 export async function getHistorialCitaciones(estudianteId) {
-  const res = await fetch(`${BASE_URL}/citaciones/estudiante/${estudianteId}/historial`, {
+  const res = await pedir(`${BASE_URL}/citaciones/estudiante/${estudianteId}/historial`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -599,12 +610,12 @@ export async function getHistorialCitaciones(estudianteId) {
 
 // RF54 / CU85: recepción general de mensajes de apoderados (docente)
 export async function getRecepcionMensajes() {
-  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/mensajes/recepcion`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function actualizarRecepcionMensajes(habilitada) {
-  const res = await fetch(`${BASE_URL}/mensajes/recepcion`, {
+  const res = await pedir(`${BASE_URL}/mensajes/recepcion`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ habilitada }),
@@ -614,7 +625,7 @@ export async function actualizarRecepcionMensajes(habilitada) {
 
 // RF54 / CU86: habilitar respuestas en una conversación hasta "YYYY-MM-DDTHH:MM" (null cierra)
 export async function habilitarRespuestasConversacion(conversacionId, hasta) {
-  const res = await fetch(`${BASE_URL}/mensajes/conversaciones/${conversacionId}/habilitacion`, {
+  const res = await pedir(`${BASE_URL}/mensajes/conversaciones/${conversacionId}/habilitacion`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ hasta }),
@@ -624,7 +635,7 @@ export async function habilitarRespuestasConversacion(conversacionId, hasta) {
 
 // RF54 / CU86: desde una citación, hasta el término de la reunión
 export async function habilitarRespuestasCitacion(citacionId) {
-  const res = await fetch(`${BASE_URL}/citaciones/${citacionId}/habilitar-respuestas`, {
+  const res = await pedir(`${BASE_URL}/citaciones/${citacionId}/habilitar-respuestas`, {
     method : 'POST',
     headers: authHeaders(),
   });
@@ -729,7 +740,7 @@ function queryHorario(filtros = {}) {
 
 // CU68: horarios que coinciden con los filtros (docente, curso, nivel, asignatura, jornada, día, estado)
 export async function filtrarHorarios(filtros) {
-  const res = await fetch(`${BASE_URL}/horarios/filtrar${queryHorario(filtros)}`, {
+  const res = await pedir(`${BASE_URL}/horarios/filtrar${queryHorario(filtros)}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -737,7 +748,7 @@ export async function filtrarHorarios(filtros) {
 
 // CU67: bloques libres (sin asignaciones activas) — Super Admin/Admin
 export async function getBloquesLibres(filtros) {
-  const res = await fetch(`${BASE_URL}/horarios/bloques-libres${queryHorario(filtros)}`, {
+  const res = await pedir(`${BASE_URL}/horarios/bloques-libres${queryHorario(filtros)}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -745,7 +756,7 @@ export async function getBloquesLibres(filtros) {
 
 // CU69: detalle de un bloque programado (Horario_Asignatura_Id)
 export async function getDetalleBloqueHorario(horarioId) {
-  const res = await fetch(`${BASE_URL}/horarios/bloque-detalle/${horarioId}`, {
+  const res = await pedir(`${BASE_URL}/horarios/bloque-detalle/${horarioId}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -753,24 +764,24 @@ export async function getDetalleBloqueHorario(horarioId) {
 
 // Datos de apoyo para los criterios de filtrado
 export async function getCursosHorario() {
-  const res = await fetch(`${BASE_URL}/horarios/cursos`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/horarios/cursos`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function getAsignaturasHorario() {
-  const res = await fetch(`${BASE_URL}/horarios/asignaturas`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/horarios/asignaturas`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // ── Horas P.I.E. del docente y regla 65/35 ──
 export async function getPIEDocente(docenteId, periodo) {
   const q = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
-  const res = await fetch(`${BASE_URL}/usuarios/${docenteId}/pie${q}`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/usuarios/${docenteId}/pie${q}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function guardarPIEDocente(docenteId, { horasPIE, bloques, periodo }) {
-  const res = await fetch(`${BASE_URL}/usuarios/${docenteId}/pie`, {
+  const res = await pedir(`${BASE_URL}/usuarios/${docenteId}/pie`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ horasPIE, bloques, periodo }),
@@ -779,12 +790,12 @@ export async function guardarPIEDocente(docenteId, { horasPIE, bloques, periodo 
 }
 
 export async function getBloquesInstitucionales() {
-  const res = await fetch(`${BASE_URL}/horarios/bloques`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/horarios/bloques`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 export async function getNivelesEducativos() {
-  const res = await fetch(`${BASE_URL}/cursos/niveles`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/cursos/niveles`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -792,19 +803,19 @@ export async function getNivelesEducativos() {
 
 // Bloques de atención del docente autenticado
 export async function getMiHorarioAtencion() {
-  const res = await fetch(`${BASE_URL}/horario-atencion`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/horario-atencion`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // CU87 / CU88: semana completa de atención (tramos por día + vista por bloques)
 export async function getSemanaAtencion() {
-  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/horario-atencion/semana`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // Reemplaza la semana; si hay citaciones a futuro afectadas responde 409 con requiereConfirmacion
 export async function guardarSemanaAtencion(tramos, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/horario-atencion/semana`, {
+  const res = await pedir(`${BASE_URL}/horario-atencion/semana`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ tramos, confirmar }),
@@ -817,13 +828,13 @@ export async function guardarSemanaAtencion(tramos, confirmar = false) {
 
 // Estudiantes del apoderado (como titular o suplente)
 export async function getEstudiantesSolicitud() {
-  const res = await fetch(`${BASE_URL}/citaciones/solicitud/estudiantes`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/citaciones/solicitud/estudiantes`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // Docentes que imparten clases al estudiante
 export async function getDocentesSolicitud(estudianteId) {
-  const res = await fetch(`${BASE_URL}/citaciones/solicitud/estudiante/${estudianteId}/docentes`, {
+  const res = await pedir(`${BASE_URL}/citaciones/solicitud/estudiante/${estudianteId}/docentes`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -832,7 +843,7 @@ export async function getDocentesSolicitud(estudianteId) {
 // Tramos libres dentro del horario de atención del docente en las próximas semanas
 export async function getDisponibilidadSolicitud(estudianteId, docenteId) {
   const params = new URLSearchParams({ estudianteId, docenteId });
-  const res = await fetch(`${BASE_URL}/citaciones/solicitud/disponibilidad?${params}`, {
+  const res = await pedir(`${BASE_URL}/citaciones/solicitud/disponibilidad?${params}`, {
     headers: authHeaders(),
   });
   return handleResponse(res);
@@ -840,7 +851,7 @@ export async function getDisponibilidadSolicitud(estudianteId, docenteId) {
 
 // CU89: registrar la solicitud (queda pendiente hasta que el docente la confirme)
 export async function solicitarCitacion({ estudianteId, docenteId, fecha, tramo, motivo, modalidad }) {
-  const res = await fetch(`${BASE_URL}/citaciones/solicitud`, {
+  const res = await pedir(`${BASE_URL}/citaciones/solicitud`, {
     method : 'POST',
     headers: authHeaders(),
     body   : JSON.stringify({
@@ -859,13 +870,13 @@ export async function solicitarCitacion({ estudianteId, docenteId, fecha, tramo,
 
 // CU90: titular y suplentes actuales del estudiante (Administrador)
 export async function getApoderadosEstudiante(estudianteId) {
-  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // CU90: designar el titular y hasta 4 suplentes
 export async function designarApoderadosEstudiante(estudianteId, { titularId, suplenteIds }) {
-  const res = await fetch(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, {
+  const res = await pedir(`${BASE_URL}/estudiantes/${estudianteId}/apoderados`, {
     method : 'PUT',
     headers: authHeaders(),
     body   : JSON.stringify({ titularId: Number(titularId), suplenteIds: suplenteIds.map(Number) }),
@@ -875,7 +886,7 @@ export async function designarApoderadosEstudiante(estudianteId, { titularId, su
 
 // CU91: contactos del titular y los suplentes (Docente del estudiante o Administrador)
 export async function getContactosApoderados(estudianteId) {
-  const res = await fetch(`${BASE_URL}/citaciones/estudiante/${estudianteId}/contactos`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/citaciones/estudiante/${estudianteId}/contactos`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -888,13 +899,13 @@ export async function getEvaluaciones({ mes, rol, estudianteId, cursoId, asignat
   if (estudianteId) params.set('estudianteId', estudianteId);
   if (cursoId) params.set('cursoId', cursoId);
   if (asignaturaId) params.set('asignaturaId', asignaturaId);
-  const res = await fetch(`${BASE_URL}/evaluaciones?${params}`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/evaluaciones?${params}`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
 // CU92: cursos y asignaturas del docente en el período vigente
 export async function getMisAsignacionesEvaluacion() {
-  const res = await fetch(`${BASE_URL}/evaluaciones/mis-asignaciones`, { headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/evaluaciones/mis-asignaciones`, { headers: authHeaders() });
   return handleResponse(res);
 }
 
@@ -912,7 +923,7 @@ function cuerpoEvaluacion({ cursoId, asignaturaId, fecha, tipo, contenidos }, co
 // CU92: registrar. Si la fecha tiene un evento que suspende clases, el backend responde 409
 // con requiereConfirmacion y se reintenta con confirmar = true.
 export async function crearEvaluacion(datos, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/evaluaciones`, {
+  const res = await pedir(`${BASE_URL}/evaluaciones`, {
     method: 'POST', headers: authHeaders(), body: cuerpoEvaluacion(datos, confirmar),
   });
   return handleResponse(res);
@@ -920,14 +931,14 @@ export async function crearEvaluacion(datos, confirmar = false) {
 
 // CU93: modificar o eliminar una evaluación propia
 export async function actualizarEvaluacion(id, datos, confirmar = false) {
-  const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, {
+  const res = await pedir(`${BASE_URL}/evaluaciones/${id}`, {
     method: 'PUT', headers: authHeaders(), body: cuerpoEvaluacion(datos, confirmar),
   });
   return handleResponse(res);
 }
 
 export async function eliminarEvaluacion(id) {
-  const res = await fetch(`${BASE_URL}/evaluaciones/${id}`, { method: 'DELETE', headers: authHeaders() });
+  const res = await pedir(`${BASE_URL}/evaluaciones/${id}`, { method: 'DELETE', headers: authHeaders() });
   return handleResponse(res);
 }
 

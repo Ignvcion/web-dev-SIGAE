@@ -4,6 +4,7 @@ import { useAuth } from "../pages/context/AuthContext";
 import { MOSTRAR_MIS_CURSOS } from "../config/funcionalidades";
 import { etiquetaRol, enlacesUTP, tieneUTPActiva, esAdministradorUTP } from "../utils/permisos";
 import CampanaNotificaciones from "../components/CampanaNotificaciones";
+import InvitacionInstalarApp, { BotonInstalarApp } from "../components/pwa/InstalarApp";
 
 function MainLayout() {
   const { usuario, rolActivo, logout } = useAuth();
@@ -52,7 +53,7 @@ function MainLayout() {
         </button>
 
         <img
-          src="/logo-colegio.png"
+          src={`${import.meta.env.BASE_URL}logo-colegio.png`}
           alt="Logo Colegio Jacques Cousteau"
           className="mobile-topbar-logo"
         />
@@ -83,7 +84,7 @@ function MainLayout() {
         <div>
           <div className="logo-row">
             <img
-              src="/logo-colegio.png"
+              src={`${import.meta.env.BASE_URL}logo-colegio.png`}
               alt="Logo Colegio Jacques Cousteau"
               className="sidebar-logo-img"
             />
@@ -373,6 +374,7 @@ function MainLayout() {
                 </Link>
               </>
             )}
+            <BotonInstalarApp />
           </nav>
         </div>
 
@@ -388,6 +390,8 @@ function MainLayout() {
       <main className="main-content">
         <Outlet />
       </main>
+
+      <InvitacionInstalarApp />
     </div>
   );
 }
