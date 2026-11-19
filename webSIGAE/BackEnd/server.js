@@ -1,6 +1,7 @@
 // server.js
 const { esProduccion, UPLOADS_DIR, origenesCors, validarEntornoProduccion } = require('./config/env');
 const { instalarLogsSeguros } = require('./utils/logger');
+const { instalarFrontend } = require('./utils/servirFrontend');
 
 // Producción: logs sin RUT, nombres ni notas (ver utils/logger.js) y arranque
 // abortado si falta una variable obligatoria del .env (ver config/env.js).
@@ -32,7 +33,19 @@ app.set('trust proxy', 1);
 // el FrontEnd (otro origen: distinto puerto/dominio) cargue imágenes de /uploads
 // vía <img>, lo que rompe las fotografías de perfil (RF14/CU20) en este esquema
 // de CORS explícito entre FrontEnd y BackEnd.
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// CSP: helmet por defecto, más blob: en imágenes (vista previa de la foto de
+// perfil) y sin upgrade-insecure-requests, que rompería la app abierta en
+// http://localhost:3000; detrás de un túnel o de Nginx todo llega por HTTPS.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'upgrade-insecure-requests': null,
+    },
+  },
+}));
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
     if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
@@ -85,6 +98,10 @@ app.use('/api/evaluaciones', evaluacionRoutes);
 app.use('/api/electivos', electivoRoutes);
 app.use('/api/colores', colorRoutes);
 app.use('/api/notificaciones', notificacionRoutes);
+
+// Opcional: la app compilada en el mismo puerto, para publicarla con un túnel
+// (iniciar-sigae.bat). En el servidor del colegio la sirve Nginx.
+if (process.env.SERVIR_FRONTEND === '1') instalarFrontend(app);
 
 // 404
 app.use((req, res) => {

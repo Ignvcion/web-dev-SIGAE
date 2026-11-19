@@ -7,6 +7,8 @@
 .env
 .env.*
 !.env.example
+# Configuración local del túnel de SIGAE (ver webSIGAE/tunel.config.example)
+tunel.config
 *.bak
 *.pem
 *.ppk

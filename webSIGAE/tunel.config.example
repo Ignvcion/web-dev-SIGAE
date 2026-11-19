@@ -1,0 +1,14 @@
+# Configuración del túnel de SIGAE (copia este archivo como tunel.config)
+#
+# Con ngrok, SIGAE queda SIEMPRE en la misma dirección (gratis, una por cuenta):
+#   1. Crea una cuenta en https://dashboard.ngrok.com/signup
+#   2. En "Your Authtoken" copia tu token y ejecútalo una vez en PowerShell:
+#        ngrok config add-authtoken TU_TOKEN
+#      (si aún no tienes ngrok, iniciar-sigae.bat lo instala la primera vez)
+#   3. En "Domains" copia tu dominio gratuito (termina en .ngrok-free.app)
+#      y pégalo abajo.
+#
+# Sin este archivo, iniciar-sigae.bat usa Cloudflare: funciona sin cuenta,
+# pero la dirección cambia cada vez que lo inicias.
+
+NGROK_DOMINIO=tu-dominio.ngrok-free.app

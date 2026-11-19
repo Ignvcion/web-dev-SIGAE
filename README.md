@@ -282,6 +282,26 @@ No agregues archivos de migración aparte mientras tanto.
 
 ---
 
+## 🌐 Publicar SIGAE desde tu computador (túnel)
+
+Para usar SIGAE desde el celular o compartirla sin un servidor, tu computador puede publicarla con un túnel HTTPS. El backend sirve la app compilada y la API en el puerto 3000, y el túnel entrega una dirección pública con HTTPS, así que la PWA se puede instalar.
+
+**Requisitos:** haber corrido `bash win_setup.sh` una vez y tener MySQL encendido.
+
+1. Detén SIGAE en VS Code si está corriendo (Shift+F5).
+2. Haz doble clic en **`webSIGAE/iniciar-sigae.bat`**. El script revisa todo, compila el FrontEnd, inicia el backend en otra ventana y abre el túnel.
+3. Copia la dirección que aparece en verde (también queda en el portapapeles) y ábrela en cualquier dispositivo.
+
+Para detenerlo, cierra las dos ventanas. Si no cambiaste el FrontEnd, puedes saltar la compilación con `iniciar-sigae.bat -SinCompilar`.
+
+**Dirección fija con ngrok (recomendado).** Sin configuración se usa Cloudflare, que no pide cuenta pero cambia la dirección cada vez. Para tener siempre la misma:
+
+1. Crea una cuenta gratis en [ngrok](https://dashboard.ngrok.com/signup).
+2. Copia `webSIGAE/tunel.config.example` como `webSIGAE/tunel.config` y pon tu dominio gratuito de ngrok en `NGROK_DOMINIO` (está en *Domains*).
+3. La primera vez, ejecuta en PowerShell `ngrok config add-authtoken TU_TOKEN` (el token está en *Your Authtoken*). Si aún no tienes ngrok, `iniciar-sigae.bat` lo instala.
+
+> La app solo está disponible mientras tu computador esté encendido, sin suspenderse y con las dos ventanas abiertas. `tunel.config` no se sube a git.
+
 ## 📦 Deploy
 
 Producción durante la marcha blanca:
