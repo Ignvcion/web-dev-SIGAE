@@ -96,15 +96,22 @@ export function colorOscuro(valor, tipo) {
   // Intensidad real del color (en tonos muy claros la saturación HSL engaña)
   const croma = (Math.max(rgba[0], rgba[1], rgba[2]) - Math.min(rgba[0], rgba[1], rgba[2])) / 255;
   let nuevo = null;
-  if (tipo === "fondo" && l > 0.85) {
-    // Pastel con color (avisos, etiquetas): un tono oscuro del mismo color.
-    // Neutros: gris pizarra, como la barra lateral; el blanco queda un poco más claro que
-    // los grises, para mantener la jerarquía tarjeta > fondo de página.
-    nuevo = croma > 0.05
-      ? desdeHsl(h, Math.min(Math.max(s, 0.35), 0.55), 0.2)
-      : desdeHsl(220 / 360, 0.24, 0.07 + ((l - 0.85) / 0.15) * 0.08);
-  } else if (tipo === "texto" && l < 0.55) {
-    nuevo = desdeHsl(h, Math.min(s, 0.85), 0.95 - l * 0.5);
+  if (tipo === "fondo") {
+    // Capas semitransparentes (sombras, velos, resaltes sobre botones): quedan igual
+    if (rgba[3] < 0.5) return null;
+    if (l > 0.85) {
+      // Pastel con color (avisos, etiquetas): un tono oscuro del mismo color.
+      // Neutros: gris pizarra, como la barra lateral; el blanco queda un poco más claro que
+      // los grises, para mantener la jerarquía tarjeta > fondo de página.
+      nuevo = croma > 0.05
+        ? desdeHsl(h, Math.min(Math.max(s, 0.35), 0.55), 0.2)
+        : desdeHsl(220 / 360, 0.24, 0.07 + ((l - 0.85) / 0.15) * 0.08);
+    } else if (l > 0.72) {
+      // Grises y colores medio claros (chips, separadores): un tono oscuro pero visible
+      nuevo = croma > 0.05 ? desdeHsl(h, Math.min(s, 0.5), 0.3) : desdeHsl(220 / 360, 0.2, 0.28);
+    }
+  } else if (tipo === "texto" && l < 0.62) {
+    nuevo = desdeHsl(h, Math.min(s, 0.85), 0.95 - l * 0.45);
   } else if (tipo === "borde" && l > 0.75) {
     nuevo = desdeHsl(h, Math.min(s, 0.3), 0.22 + (1 - l) * 0.4);
   }
@@ -148,10 +155,15 @@ function prefijar(selector) {
 function convertirReglas(reglas, salida) {
   for (const regla of reglas) {
     if (regla.type === 1 /* estilo */) {
+      // Se copian TODAS las propiedades de color de la regla (convertidas o tal cual):
+      // así las reglas oscuras mantienen entre sí la misma cascada que las originales y
+      // una regla más específica (p. ej. un botón activo) no queda tapada.
       const decl = [];
       for (const [prop, tipo] of PROPIEDADES) {
-        const nuevo = colorOscuro(regla.style.getPropertyValue(prop), tipo);
-        if (nuevo) decl.push(`${prop}: ${nuevo}${regla.style.getPropertyPriority(prop) ? " !important" : ""}`);
+        const valor = regla.style.getPropertyValue(prop);
+        if (!valor) continue;
+        const nuevo = colorOscuro(valor, tipo);
+        decl.push(`${prop}: ${nuevo || valor}${regla.style.getPropertyPriority(prop) ? " !important" : ""}`);
       }
       if (decl.length) salida.push(`${separarSelectores(regla.selectorText).map(prefijar).join(", ")} { ${decl.join("; ")} }`);
     } else if (regla.type === 4 /* @media */ || regla.type === 12 /* @supports */) {
