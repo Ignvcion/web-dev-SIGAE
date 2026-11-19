@@ -312,6 +312,21 @@ Usa `webSIGAE/ver-sigae.bat` para ver la dirección y los últimos eventos, y `w
 
 > Usa ngrok (dirección fija): con Cloudflare la dirección cambia cada vez que el túnel se reinicia. SIGAE no puede funcionar con el computador apagado, sin internet o antes de iniciar sesión en Windows.
 
+## ☁️ Publicar SIGAE en la nube (Railway)
+
+Para que SIGAE funcione siempre sin depender de un computador encendido. El repositorio trae un `Dockerfile` y un `railway.json`: Railway compila la app, la sirve junto con la API en una dirección HTTPS y, la primera vez, carga `Database/SIGAE.sql` en la base vacía (`BackEnd/scripts/prepararBaseNube.js`; si la base ya tiene tablas, no toca nada).
+
+1. Entra a [railway.com](https://railway.com) con tu cuenta de GitHub.
+2. **New Project → Deploy from GitHub repo** y elige este repositorio. En el servicio creado, **Settings → Source**, elige la rama que quieres publicar.
+3. En el mismo proyecto: **+ New → Database → MySQL**.
+4. En el servicio de SIGAE, **Variables**, agrega:
+   - `MYSQL_URL` = `${{MySQL.MYSQL_URL}}` (conecta la base del proyecto)
+   - `JWT_SECRET` = `${{secret(64)}}` (clave aleatoria para las sesiones)
+5. **Settings → Volumes**: agrega un volumen montado en `/data` (ahí quedan las fotos de perfil).
+6. **Settings → Networking → Generate Domain** para obtener la dirección pública.
+
+Cada vez que subas cambios a esa rama, Railway publica la versión nueva. Sin correo SMTP configurado, los códigos de verificación se muestran en pantalla (modo de pruebas). **Usa solo datos de prueba** y cambia las contraseñas de los usuarios de prueba antes de compartir la dirección.
+
 ## 📦 Deploy
 
 Producción durante la marcha blanca:
