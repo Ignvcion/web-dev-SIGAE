@@ -4509,3 +4509,11 @@ body {
     text-align: center;
   }
 }
+
+/* Tablas anchas: se deslizan hacia los lados en vez de recortarse
+   (.tabla-usuarios { overflow: hidden } las cortaba en el celular) */
+.tabla-responsive-container > .tabla-usuarios { overflow: visible; }
+@media (max-width: 768px) {
+  .tabla-usuarios { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+  .tabla-responsive-container > .tabla-usuarios { overflow: visible; }
+}
