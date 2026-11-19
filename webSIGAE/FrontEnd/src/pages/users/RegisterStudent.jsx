@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { registrarEstudiante, verificarRutEstudiante, apiUrl} from '../../services/api';
+import { registrarEstudiante, verificarRutEstudiante, apiUrl } from "../../services/api";
 import { validarRut, normalizarRut, validarDireccion } from "../../utils/validaciones";
 import CamposDireccion, { CAMPOS_DIRECCION, errorCampoDireccion } from "../../components/CamposDireccion";
 import { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { apiUrl } from "../../services/api";
 import {
   getMisJefaturas,
   getSituaciones,
@@ -11,7 +12,6 @@ import {
   cargarExcel,
   promoverCurso,
 } from "../../services/promocion";
-import { apiUrl } from '../../services/api';
 
 const ETIQUETA_ESTADO = { Borrador: "Borrador", Registrado: "Registrada", Aplicado: "Aplicada" };
 

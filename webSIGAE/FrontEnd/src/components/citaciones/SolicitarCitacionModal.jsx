@@ -5,7 +5,7 @@ import {
   getDisponibilidadSolicitud,
   solicitarCitacion,
 } from "../../services/api";
-import { MAX_MOTIVO, MIN_MOTIVO, MODALIDADES, formatearFecha } from "../../utils/citaciones";
+import { MAX_MOTIVO, MIN_MOTIVO, MODALIDADES, esTramoPasadoHoy, formatearFecha } from "../../utils/citaciones";
 
 // Respuestas del backend: arreglo directo, o { mensaje, <clave>: [] } para "sin registros"
 function extraerLista(data, clave) {
@@ -155,6 +155,9 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
   };
 
   const docenteSel = docentes.find((d) => String(d.Usuario_Id) === String(form.docenteId));
+  const diasVigentes = (dias || [])
+    .map((d) => ({ ...d, tramos: (d.tramos || []).filter((t) => !esTramoPasadoHoy(d.fecha, t)) }))
+    .filter((d) => d.tramos.length > 0);
 
   return (
     <div className="modal-overlay">
@@ -246,11 +249,11 @@ function SolicitarCitacionModal({ onClose, onSolicitada }) {
                 <label>Tramos disponibles{docenteSel ? ` de ${docenteSel.Usuario_Nombre_Completo}` : ""}</label>
                 {cargandoDisponibilidad ? (
                   <p className="empty-state-text">Consultando disponibilidad...</p>
-                ) : dias.length === 0 ? (
-                  <div className="cit-nota">{msgDisponibilidad}</div>
+                ) : diasVigentes.length === 0 ? (
+                  <div className="cit-nota">{msgDisponibilidad || "No hay tramos horarios disponibles."}</div>
                 ) : (
                   <div className="sol-disponibilidad">
-                    {dias.map((d) => (
+                    {diasVigentes.map((d) => (
                       <div key={d.fecha} className="sol-dia">
                         <div className="sol-dia-fecha">{formatearFecha(d.fecha, { corta: true })} · {d.dia}</div>
                         <div className="sol-tramos">

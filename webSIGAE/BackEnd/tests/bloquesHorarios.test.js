@@ -331,4 +331,31 @@ describe('Parámetros institucionales sin configurar (primera vez)', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(pool.execute).not.toHaveBeenCalled();
   });
+
+  test('PUT acepta duración de recreo igual a 0 y rechaza valores fuera de rango u hora inválida', async () => {
+    pool.execute
+      .mockResolvedValueOnce([[{ Parametro_Institucional_Id: 1 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    const resOk = nuevoRes();
+    await bloquesController.updateParametros({
+      body: { ...PARAMETROS, Parametro_Institucional_Duracion_Recreo: 0 },
+    }, resOk);
+    expect(resOk.status).not.toHaveBeenCalled();
+    expect(pool.execute.mock.calls[1][1]).toEqual(['08:00', '16:30', 45, 0, 8, 1]);
+
+    jest.clearAllMocks();
+    const resRango = nuevoRes();
+    await bloquesController.updateParametros({
+      body: { ...PARAMETROS, Parametro_Institucional_Duracion_Bloque: '200' },
+    }, resRango);
+    expect(resRango.status).toHaveBeenCalledWith(400);
+    expect(pool.execute).not.toHaveBeenCalled();
+
+    const resHora = nuevoRes();
+    await bloquesController.updateParametros({
+      body: { ...PARAMETROS, Parametro_Institucional_Inicio_Jornada: '25:99' },
+    }, resHora);
+    expect(resHora.status).toHaveBeenCalledWith(400);
+    expect(pool.execute).not.toHaveBeenCalled();
+  });
 });

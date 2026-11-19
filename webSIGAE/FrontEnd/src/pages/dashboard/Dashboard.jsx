@@ -112,7 +112,7 @@ function DashboardAdmin({ esSuperAdmin }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/api/dashboard/stats")
+    apiFetch("/dashboard/stats")
       .then((r) => {
         if (!r || !r.ok) throw new Error();
         return r.json();
@@ -231,10 +231,10 @@ function ResumenComunicaciones({ rol }) {
               {proximas.map((c) => (
                 <li
                   key={c.Citacion_Id}
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem",
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem 0.75rem",
                     padding: "0.6rem 0.8rem", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
                 >
-                  <div>
+                  <div style={{ minWidth: 0, flex: "1 1 200px" }}>
                     <div style={{ fontWeight: 600 }}>
                       {formatearFecha(c.Citacion_Fecha, { corta: true })} · {c.Citacion_Tramo_Horario}
                     </div>
@@ -300,7 +300,7 @@ function AsignaturasPorCurso({ docenteId }) {
       {!loading && !error && cursos.length === 0 && <p>No tienes asignaturas asignadas.</p>}
 
       {cursos.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: "1rem", marginTop: "1rem" }}>
           {cursos.map((c) => (
             <TarjetaCurso
               key={c.cursoId}

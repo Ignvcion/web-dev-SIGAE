@@ -16,10 +16,18 @@ const MAX_SUPLENTES_POR_DEFECTO = 4;
  *
  * apoderados: opciones (usuarios con rol Apoderado); onGuardado(mensaje): el padre recarga.
  */
-function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado }) {
+function ApoderadosEstudianteModal({
+  estudiante,
+  apoderados,
+  errorApoderados = "",
+  onRecargarApoderados,
+  onClose,
+  onGuardado,
+}) {
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
   const [maxSuplentes, setMaxSuplentes] = useState(MAX_SUPLENTES_POR_DEFECTO);
+  const [titularActual, setTitularActual] = useState(null);
   const [titularInicial, setTitularInicial] = useState("");
   const [titularId, setTitularId] = useState("");
   const [suplentes, setSuplentes] = useState([]); // [{ Usuario_Id, Usuario_Nombre_Completo }]
@@ -29,32 +37,39 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
 
   useEffect(() => {
     let activo = true;
+    if (apoderados.length === 0) onRecargarApoderados?.();
     getApoderadosEstudiante(estudiante.Estudiante_Id)
       .then((data) => {
         if (!activo) return;
         const titular = data?.titular?.Usuario_Id ? String(data.titular.Usuario_Id) : "";
+        setTitularActual(data?.titular || null);
         setTitularInicial(titular);
         setTitularId(titular);
-        setSuplentes(data?.suplentes || []);
+        setSuplentes(Array.isArray(data?.suplentes) ? data.suplentes : []);
         setMaxSuplentes(data?.maxSuplentes || MAX_SUPLENTES_POR_DEFECTO);
       })
       .catch((error) => activo && setErrorCarga(error.message || "No fue posible cargar los apoderados del estudiante"))
       .finally(() => activo && setCargando(false));
     return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estudiante.Estudiante_Id]);
 
   const nombreDe = (id) =>
     apoderados.find((a) => String(a.Usuario_Id) === String(id))?.Usuario_Nombre_Completo
+    || (String(titularActual?.Usuario_Id) === String(id) ? titularActual.Usuario_Nombre_Completo : "")
     || suplentes.find((s) => String(s.Usuario_Id) === String(id))?.Usuario_Nombre_Completo
     || "";
 
   // Apoderados que se pueden asociar (activos o inactivos por no tener estudiantes, que se
-  // reactivan al guardar) y que no estén ya elegidos
+  // reactivan al guardar) y que no estén ya elegidos; conservar titular actual si ya estaba asignado
   const activos = apoderados.filter(puedeAsociarse);
+  const candidatosTitular = titularActual && !activos.some((a) => String(a.Usuario_Id) === String(titularActual.Usuario_Id))
+    ? [titularActual, ...activos]
+    : activos;
   const idsSuplentes = suplentes.map((s) => String(s.Usuario_Id));
-  const opcionesTitular = activos.filter((a) => !idsSuplentes.includes(String(a.Usuario_Id)));
+  const opcionesTitular = candidatosTitular.filter((a) => !idsSuplentes.includes(String(a.Usuario_Id)));
   const opcionesSuplente = activos.filter(
-    (a) => String(a.Usuario_Id) !== titularId && !idsSuplentes.includes(String(a.Usuario_Id))
+    (a) => String(a.Usuario_Id) !== String(titularId) && !idsSuplentes.includes(String(a.Usuario_Id))
   );
 
   const cambiarTitular = (id) => {
@@ -142,7 +157,9 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
         </div>
         <p className="modal-subtitulo">
           <strong>{estudiante.Estudiante_Nombre_Completo}</strong>
-          {estudiante.Curso_Nombre ? ` · ${estudiante.Curso_Nombre}` : ""}
+          {estudiante.Curso_Nombre && (
+            <> · <span className="modal-subtitulo-curso">{estudiante.Curso_Nombre}</span></>
+          )}
         </p>
 
         {cargando ? (
@@ -165,13 +182,19 @@ function ApoderadosEstudianteModal({ estudiante, apoderados, onClose, onGuardado
                 onChange={(e) => cambiarTitular(e.target.value)}
               >
                 <option value="">
-                  {suplentes.length > 0 ? "Selecciona el titular..." : "Ninguno (eliminar asociación)"}
+                  {titularInicial && suplentes.length === 0 ? "Ninguno (eliminar asociación)" : "Selecciona el titular..."}
                 </option>
                 {opcionesTitular.map((a) => (
                   <option key={a.Usuario_Id} value={a.Usuario_Id}>{etiquetaApoderado(a)}</option>
                 ))}
               </select>
-              <span className="cit-sub">Cada estudiante tiene un único apoderado titular.</span>
+              {errorApoderados ? (
+                <span className="msg-error-form">{errorApoderados}</span>
+              ) : opcionesTitular.length === 0 ? (
+                <span className="cit-sub">No hay apoderados disponibles para asignar.</span>
+              ) : (
+                <span className="cit-sub">Cada estudiante tiene un único apoderado titular.</span>
+              )}
             </div>
 
             <div className="campo-pwd">

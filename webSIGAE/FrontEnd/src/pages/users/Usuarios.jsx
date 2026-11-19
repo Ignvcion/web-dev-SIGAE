@@ -101,7 +101,7 @@ const cambiarEstadoCuenta = async (u) => {
 
   setLoadingToggle(true);
   try {
-    const res = await apiFetch(`/api/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
+    const res = await apiFetch(`/usuarios/${u.Usuario_Id}/estado`, { method: "PUT" });
     if (!res) return;
     const data = await res.json();
     if (!res.ok) alert(data.mensaje || "Error al cambiar estado");
@@ -207,7 +207,8 @@ const cambiarEstadoCuenta = async (u) => {
       {!errorCarga && !mensajeInfo && usuariosFiltrados.length === 0 ? (
         <div className="usuarios-empty">No se encontraron usuarios</div>
       ) : !errorCarga && !mensajeInfo && (
-        <table className="tabla-usuarios">
+        <div className="tabla-responsive-container">
+          <table className="tabla-usuarios">
           <thead>
             <tr>
               <th>#</th>
@@ -222,11 +223,11 @@ const cambiarEstadoCuenta = async (u) => {
           </thead>
           <tbody>
             {usuariosFiltrados.map((u, idx) => {
-              const esMismoUsuario = u.Usuario_Id === usuario?.id;
+              const esMismoUsuario = Number(u.Usuario_Id) === Number(usuario?.id);
               const esSuperAdminFila = u.Administrador_Tipo === "Super Admin";
 
               return (
-                <tr key={u.Usuario_Id}>
+                <tr key={u.Usuario_Id || u.Usuario_RUT || idx}>
                   <td>{idx + 1}</td>
                   <td>{u.Usuario_Nombre_Completo}</td>
                   <td>{u.Usuario_RUT}</td>
@@ -269,8 +270,9 @@ const cambiarEstadoCuenta = async (u) => {
                 </tr>
               );
             })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
     </div>

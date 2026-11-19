@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, hhmm } from "../../utils/horarios";
 import useColores from "../../hooks/useColores";
-import { apiUrl } from '../../services/api';
+import { apiUrl, BASE_URL } from "../../services/api";
 
 // Panel desplegable (derecha) con las clases pendientes de reubicar tras
 // redefinir la jornada o los bloques horarios. Por cada clase: migrar a un
@@ -14,7 +14,7 @@ import { apiUrl } from '../../services/api';
 // recupera sus colores mientras se interactúa con ella: al pasar el mouse,
 // al enfocar o usar sus botones o al seleccionar su texto.
 
-const API = "/api/bloques/conflictos";
+const API = `${BASE_URL}/bloques/conflictos`;
 const CLAVE_POSPUESTAS = "sigae.conflictosHorario.pospuestas";
 const MINUTOS_POSPONER = 15;
 const REFRESCO_MS = 30_000;

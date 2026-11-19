@@ -195,7 +195,7 @@ function GestionRoles() {
 
   // El estado cambia solo al llegar la respuesta (callbacks), así puede llamarse desde el efecto.
   const cargarUsuarios = () =>
-    apiFetch("/api/usuarios")
+    apiFetch("/usuarios")
       .then(async (res) => {
         if (!res) return;
         const data = await res.json();
@@ -230,7 +230,7 @@ function GestionRoles() {
 
   const refreshSeleccionado = async () => {
     try {
-      const res = await apiFetch("/api/usuarios");
+      const res = await apiFetch("/usuarios");
       if (!res) return;
       const data = await res.json();
       const lista = Array.isArray(data) ? data : [];
@@ -270,7 +270,7 @@ function GestionRoles() {
           Es_Apoderado:     rol === "Apoderado"     ? 0 : (seleccionado.Es_Apoderado     ? 1 : 0),
           Administrador_Tipo: rol === "Administrador" ? null : (seleccionado.Administrador_Tipo || null),
         };
-        const res = await apiFetch(`/api/usuarios/${seleccionado.Usuario_Id}/roles`, {
+        const res = await apiFetch(`/usuarios/${seleccionado.Usuario_Id}/roles`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -285,7 +285,7 @@ function GestionRoles() {
           await refreshSeleccionado();
         }
       } else if (accion.tipo === "reactivar-cuenta") {
-        const res = await apiFetch(`/api/usuarios/${seleccionado.Usuario_Id}/estado`, { method: "PUT" });
+        const res = await apiFetch(`/usuarios/${seleccionado.Usuario_Id}/estado`, { method: "PUT" });
         if (!res) return;
         const data = await res.json();
         if (!res.ok) {
@@ -434,7 +434,7 @@ function GestionRoles() {
     setMsgError("");
 
     try {
-      const res = await apiFetch(`/api/usuarios/${seleccionado.Usuario_Id}/asignar-rol`, {
+      const res = await apiFetch(`/usuarios/${seleccionado.Usuario_Id}/asignar-rol`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rol: rolNuevo, ...datosRol }),

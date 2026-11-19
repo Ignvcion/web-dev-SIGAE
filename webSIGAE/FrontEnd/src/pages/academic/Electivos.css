@@ -21,7 +21,7 @@
 .el-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .el-vacio .el-acciones { justify-content: center; }
 
-.el-rutas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.el-rutas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
 .el-ruta { border: 1px solid #e2e8f0; border-top: 4px solid var(--borde); border-radius: 12px; padding: 14px; background: #fcfcfd; }
 .el-ruta--c { --borde: var(--el-c-borde); }
 .el-ruta--h { --borde: var(--el-h-borde); }

@@ -74,7 +74,7 @@ function DetalleBloqueModal({ horarioId, onClose }) {
             <dd>
               {detalle.observaciones?.length > 0 ? (
                 <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                  {detalle.observaciones.map((obs) => <li key={obs}>{obs}</li>)}
+                  {detalle.observaciones.map((obs, idx) => <li key={`${obs}-${idx}`}>{obs}</li>)}
                 </ul>
               ) : (
                 "Sin observaciones."

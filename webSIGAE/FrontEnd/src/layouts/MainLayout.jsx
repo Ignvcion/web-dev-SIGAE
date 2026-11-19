@@ -104,6 +104,23 @@ function MainLayout() {
 
               {/* CU101: notificaciones de mensajes y citaciones (no aplica al administrador con UTP) */}
               {!esAdministradorUTP(usuario, rolActivo) && <CampanaNotificaciones rol={rolEfectivo} />}
+              {usuario?.roles && usuario.roles.length > 1 && (
+                <div style={{ marginTop: "4px" }}>
+                  <Link
+                    to="/seleccionar-rol"
+                    style={{
+                      fontSize: "11px",
+                      color: "#93c5fd",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      display: "inline-block"
+                    }}
+                    title="Cambiar de perfil activo"
+                  >
+                    ⇄ Cambiar perfil ({usuario.roles.length})
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -148,11 +165,9 @@ function MainLayout() {
                         </Link>
                       )}
 
-                      {esSuperAdmin && (
-                        <Link to="/gestion-roles">
-                          Gestión de Roles
-                        </Link>
-                      )}
+                      <Link to="/gestion-roles">
+                        Gestión de Roles
+                      </Link>
 
                       <Link to="/docentes">
                         Gestión de Docentes

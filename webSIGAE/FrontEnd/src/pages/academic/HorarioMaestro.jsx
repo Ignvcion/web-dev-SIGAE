@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getHorarioMaestro, getDocentes, apiUrl} from '../../services/api';
+import { getHorarioMaestro, getDocentes, apiUrl, BASE_URL } from "../../services/api";
 import ExportMenu from "../../components/ExportMenu";
 import { COLORES_ASIGNATURA, COLOR_PENDIENTE, DIAS_SEMANA, aMinutos, hhmm } from "../../utils/horarios";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
@@ -106,14 +106,14 @@ function HorarioMaestro() {
   const hayFiltros = filtroCurso || filtroDocente;
 
   return (
-    <div style={s.page}>
+    <div className="horarios-page">
       <div style={s.header}>
         <div>
           <h1 style={s.titulo}>Horario Maestro</h1>
           <p style={s.subtitulo}>Vista consolidada de todos los bloques, cursos y docentes de la institución</p>
         </div>
         {!loading && !errorCarga && (
-          <ExportMenu label="Exportar maestro" url="/api/horarios/exportar/maestro" filenameBase="horario_maestro" />
+          <ExportMenu label="Exportar maestro" url={`${BASE_URL}/horarios/exportar/maestro`} filenameBase="horario_maestro" />
         )}
       </div>
 
@@ -188,10 +188,10 @@ function HorarioMaestro() {
           )}
 
           <div style={s.grillaWrap}>
-            <table style={vista === "semana" ? { ...s.tabla, tableLayout: "fixed" } : s.tabla}>
+            <table style={vista === "semana" ? { ...s.tabla, tableLayout: "fixed", minWidth: 760 } : s.tabla}>
               <thead>
                 <tr>
-                  <th style={{ ...s.th, ...s.thBloque, ...(vista === "semana" ? { width: 120 } : {}) }}>Bloque</th>
+                  <th className="hm-th-bloque" style={{ ...s.th, ...s.thBloque, ...(vista === "semana" ? { width: 120 } : {}) }}>Bloque</th>
                   {vista === "dia"
                     ? columnasCurso.map((c) => (
                         <th key={c.id} style={{ ...s.th, position: "relative", paddingTop: 24 }}>
@@ -210,7 +210,7 @@ function HorarioMaestro() {
                   if (b.Bloque_Horario_Tipo === "Recreo") {
                     return (
                       <tr key={b.Bloque_Horario_Id}>
-                        <td style={{ ...s.tdBloque, ...s.recreo }}>
+                        <td className="hm-td-bloque" style={{ ...s.tdBloque, ...s.recreo }}>
                           <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin)}</div>
                         </td>
                         <td colSpan={columnas} style={{ ...s.recreo, ...s.recreoBanda }}>⛹ Recreo</td>
@@ -223,7 +223,7 @@ function HorarioMaestro() {
 
                   return (
                     <tr key={b.Bloque_Horario_Id}>
-                      <td style={{ ...s.tdBloque, ...(desajustado ? { background: COLOR_PENDIENTE.bg } : {}) }}>
+                      <td className="hm-td-bloque" style={{ ...s.tdBloque, ...(desajustado ? { background: COLOR_PENDIENTE.bg } : {}) }}>
                         <div style={s.horaBloque}>{hhmm(b.Bloque_Horario_Hora_Inicio)} – {hhmm(b.Bloque_Horario_Hora_Fin)}</div>
                         <div style={s.jornada}>{b.Bloque_Horario_Jornada}</div>
                         {desajustado && (
@@ -396,7 +396,7 @@ const s = {
   toolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.75rem" },
   segmento: { display: "flex", border: "1px solid #cbd5e1", borderRadius: 8, overflow: "hidden" },
   select: {
-    width: "auto", minWidth: 190, flex: "0 0 auto", margin: 0,
+    width: "auto", minWidth: 0, maxWidth: "100%", flex: "1 1 180px", margin: 0,
     padding: "0.4rem 0.6rem", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", background: "#fff",
   },
   btnLimpiar: { padding: "0.4rem 0.7rem", borderRadius: 8, border: "1px solid #e5e7eb", background: "#f8fafc", color: "#475569", fontSize: "0.8rem", cursor: "pointer" },

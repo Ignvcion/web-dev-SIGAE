@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import BloquePIE from "../../components/BloquePIE";
-import { getEspecialidades, getDisponibilidadDocente, apiUrl} from '../../services/api';
+import { getEspecialidades, getDisponibilidadDocente, apiUrl } from "../../services/api";
 import EtiquetasInput, { separarEtiquetas } from "../../components/EtiquetasInput";
 import DisponibilidadSemanal, { errorTramos } from "../../components/DisponibilidadSemanal";
 import "./FormEditarUsuario.css";

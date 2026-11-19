@@ -8,9 +8,14 @@ const { claseVigente, purgarClasesEliminadas } = require('../utils/clasesElimina
 // "08:30" < "08:30:00" y un bloque que parte justo al inicio de la jornada
 // se rechazaba como fuera de rango.
 const horaCompleta = (hora) => {
-  const [h = '00', m = '00', seg = '00'] = String(hora).split(':');
+  const [h = '00', m = '00', seg = '00'] = String(hora).trim().split(':');
   return `${h.padStart(2, '0')}:${m.padStart(2, '0')}:${seg.padStart(2, '0')}`;
 };
+
+const esHoraValida = (hora) =>
+  typeof hora === 'string' && /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(hora.trim());
+
+const valorPresente = (v) => v !== undefined && v !== null && String(v).trim() !== '';
 
 // ── PARÁMETROS INSTITUCIONALES ────────────────────────────────────
 
@@ -40,24 +45,35 @@ const updateParametros = async (req, res) => {
   } = req.body;
 
   if (
-    !Parametro_Institucional_Inicio_Jornada ||
-    !Parametro_Institucional_Fin_Jornada ||
-    !Parametro_Institucional_Duracion_Bloque ||
-    !Parametro_Institucional_Duracion_Recreo ||
-    !Parametro_Institucional_Bloques_Maximos_Diarios
+    !valorPresente(Parametro_Institucional_Inicio_Jornada) ||
+    !valorPresente(Parametro_Institucional_Fin_Jornada) ||
+    !valorPresente(Parametro_Institucional_Duracion_Bloque) ||
+    !valorPresente(Parametro_Institucional_Duracion_Recreo) ||
+    !valorPresente(Parametro_Institucional_Bloques_Maximos_Diarios)
   ) {
     return res.status(400).json({ error: 'Todos los parámetros son obligatorios' });
+  }
+
+  const inicioJornada = String(Parametro_Institucional_Inicio_Jornada).trim();
+  const finJornada    = String(Parametro_Institucional_Fin_Jornada).trim();
+  if (!esHoraValida(inicioJornada) || !esHoraValida(finJornada)) {
+    return res.status(400).json({ error: 'Formato de hora inválido' });
   }
 
   const durBloque  = Number(Parametro_Institucional_Duracion_Bloque);
   const durRecreo  = Number(Parametro_Institucional_Duracion_Recreo);
   const maxBloques = Number(Parametro_Institucional_Bloques_Maximos_Diarios);
 
-  if (![durBloque, durRecreo, maxBloques].every(Number.isInteger) || durBloque < 1 || durRecreo < 0 || maxBloques < 1) {
+  if (
+    ![durBloque, durRecreo, maxBloques].every(Number.isInteger) ||
+    durBloque < 1 || durBloque > 180 ||
+    durRecreo < 0 || durRecreo > 120 ||
+    maxBloques < 1 || maxBloques > 20
+  ) {
     return res.status(400).json({ error: 'Valores numéricos inválidos' });
   }
 
-  if (horaCompleta(Parametro_Institucional_Inicio_Jornada) >= horaCompleta(Parametro_Institucional_Fin_Jornada)) {
+  if (horaCompleta(inicioJornada) >= horaCompleta(finJornada)) {
     return res.status(400).json({ error: 'El inicio de jornada debe ser anterior al fin' });
   }
 
@@ -70,7 +86,7 @@ const updateParametros = async (req, res) => {
           Parametro_Institucional_Duracion_Bloque, Parametro_Institucional_Duracion_Recreo,
           Parametro_Institucional_Bloques_Maximos_Diarios, Parametro_Institucional_Periodo_Vigente)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [Parametro_Institucional_Inicio_Jornada, Parametro_Institucional_Fin_Jornada,
+        [inicioJornada, finJornada,
          durBloque, durRecreo, maxBloques, anioActual()]
       );
     } else {
@@ -82,7 +98,7 @@ const updateParametros = async (req, res) => {
            Parametro_Institucional_Duracion_Recreo        = ?,
            Parametro_Institucional_Bloques_Maximos_Diarios = ?
          WHERE Parametro_Institucional_Id = ?`,
-        [Parametro_Institucional_Inicio_Jornada, Parametro_Institucional_Fin_Jornada,
+        [inicioJornada, finJornada,
          durBloque, durRecreo, maxBloques, existing[0].Parametro_Institucional_Id]
       );
     }
@@ -124,6 +140,9 @@ const createBloque = async (req, res) => {
 
   if (!Bloque_Horario_Hora_Inicio || !Bloque_Horario_Hora_Fin || !Bloque_Horario_Jornada || !Bloque_Horario_Tipo) {
     return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+  }
+  if (!esHoraValida(Bloque_Horario_Hora_Inicio) || !esHoraValida(Bloque_Horario_Hora_Fin)) {
+    return res.status(400).json({ error: 'Formato de hora inválido' });
   }
   if (horaCompleta(Bloque_Horario_Hora_Inicio) >= horaCompleta(Bloque_Horario_Hora_Fin)) {
     return res.status(400).json({ error: 'La hora de inicio debe ser anterior a la hora de fin' });
@@ -223,6 +242,9 @@ const updateBloque = async (req, res) => {
 
   // CU49 - Excepción "Datos inválidos o fuera de rango"
   if (!Bloque_Horario_Hora_Inicio || !Bloque_Horario_Hora_Fin || !Bloque_Horario_Jornada || !Bloque_Horario_Tipo) {
+    return res.status(400).json({ error: 'Datos inválidos o fuera de rango' });
+  }
+  if (!esHoraValida(Bloque_Horario_Hora_Inicio) || !esHoraValida(Bloque_Horario_Hora_Fin)) {
     return res.status(400).json({ error: 'Datos inválidos o fuera de rango' });
   }
   if (horaCompleta(Bloque_Horario_Hora_Inicio) >= horaCompleta(Bloque_Horario_Hora_Fin)) {

@@ -18,6 +18,8 @@ export default function PanelJefaturaCurso({ curso, esAdmin, puedeJefatura = esA
   const [docenteId, setDocenteId] = useState("");
   const [estudiantes, setEstudiantes] = useState([]);
   const [mensajeEstudiantes, setMensajeEstudiantes] = useState("");
+  const [cursoCargado, setCursoCargado] = useState(null);
+  const cargandoEstudiantes = Boolean(curso?.Curso_Id) && Number(cursoCargado) !== Number(curso?.Curso_Id);
   const [permiteRuta, setPermiteRuta] = useState(false);
   const [seleccion, setSeleccion] = useState([]);
   const [ruta, setRuta] = useState("");
@@ -27,20 +29,28 @@ export default function PanelJefaturaCurso({ curso, esAdmin, puedeJefatura = esA
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
+    if (!curso?.Curso_Id) return undefined;
     let vivo = true;
     getEstudiantesDeCurso(curso.Curso_Id)
       .then((d) => {
-        if (!vivo || !d) return;
-        setEstudiantes(d.estudiantes || []);
-        setMensajeEstudiantes(d.mensaje || "");
-        setPermiteRuta(Boolean(d.curso?.Permite_Ruta));
+        if (!vivo) return;
+        setEstudiantes(Array.isArray(d?.estudiantes) ? d.estudiantes : Array.isArray(d) ? d : []);
+        setMensajeEstudiantes(d?.mensaje || "");
+        setPermiteRuta(Boolean(d?.curso?.Permite_Ruta));
       })
-      .catch((e) => vivo && setMensajeEstudiantes(e.message));
+      .catch((e) => {
+        if (!vivo) return;
+        setEstudiantes([]);
+        setMensajeEstudiantes(e?.message || "No fue posible cargar los estudiantes del curso.");
+      })
+      .finally(() => {
+        if (vivo) setCursoCargado(Number(curso.Curso_Id));
+      });
     if (puedeJefatura) {
       getDocentesActivos().then((d) => vivo && d && setDocentes(d)).catch(() => {});
     }
     return () => { vivo = false; };
-  }, [curso.Curso_Id, puedeJefatura]);
+  }, [curso?.Curso_Id, puedeJefatura]);
 
   // Las confirmaciones del backend (reemplazo y situaciones en registro) se piden aquí
   const asignar = async () => {
@@ -132,7 +142,7 @@ export default function PanelJefaturaCurso({ curso, esAdmin, puedeJefatura = esA
 
       {puedeJefatura && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-          <select value={docenteId} onChange={(e) => setDocenteId(e.target.value)} style={{ minWidth: "16rem", maxWidth: "100%" }}>
+          <select value={docenteId} onChange={(e) => setDocenteId(e.target.value)} style={{ minWidth: "min(16rem, 100%)", maxWidth: "100%" }}>
             <option value="">Seleccionar docente...</option>
             {docentes.map((d) => (
               <option key={d.Usuario_Id} value={d.Usuario_Id}>{d.Usuario_Nombre_Completo}</option>
@@ -151,8 +161,10 @@ export default function PanelJefaturaCurso({ curso, esAdmin, puedeJefatura = esA
       {error && <p className="msg-error">{error}</p>}
 
       <h3>Estudiantes del curso</h3>
-      {estudiantes.length === 0 ? (
-        <p>{mensajeEstudiantes || "Cargando..."}</p>
+      {cargandoEstudiantes ? (
+        <p>Cargando...</p>
+      ) : estudiantes.length === 0 ? (
+        <p>{mensajeEstudiantes || "Este curso no tiene estudiantes asignados."}</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
           {puedeAsignarRuta && (

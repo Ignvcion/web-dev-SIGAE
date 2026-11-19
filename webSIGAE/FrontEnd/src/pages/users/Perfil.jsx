@@ -5,7 +5,7 @@ import FormEditarUsuario from "./FormEditarUsuario";
 import { EtiquetasLectura } from "../../components/EtiquetasInput";
 import MiDisponibilidadLaboral from "../../components/MiDisponibilidadLaboral";
 import HorarioAtencionSemanal from "../../components/HorarioAtencionSemanal";
-import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil, apiUrl} from '../../services/api';
+import { apiFetch, getAsignacionesDocente, getEstudiantesAsociados, getDetalleEstudiante, editarPerfilPropio, confirmarCorreoPropio, actualizarFotoPerfil, apiUrl, resolveAssetUrl } from "../../services/api";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
 import { tieneEtiquetaUTP } from "../../utils/permisos";
@@ -91,7 +91,7 @@ function Perfil() {
 
   useEffect(() => {
     if (!idObjetivo) return;
-    apiFetch(`/api/usuarios/${idObjetivo}`)
+    apiFetch(`/usuarios/${idObjetivo}`)
       .then(async (r) => {
         if (!r) return; // sesión expirada: apiFetch ya redirigió
         const data = await r.json().catch(() => ({}));
@@ -176,7 +176,7 @@ function Perfil() {
   };
 
   const recargarDatos = () => {
-    apiFetch(`/api/usuarios/${idObjetivo}`)
+    apiFetch(`/usuarios/${idObjetivo}`)
       .then((r) => {
         if (!r || !r.ok) throw new Error(`HTTP ${r?.status}`);
         return r.json();
@@ -498,7 +498,7 @@ function Perfil() {
         <div className="perfil-card perfil-card--identidad">
           <div className="perfil-identidad">
             <img
-              src={previewFoto || datos?.Usuario_Foto_Perfil || FOTO_PERFIL_PLACEHOLDER}
+              src={previewFoto || resolveAssetUrl(datos?.Usuario_Foto_Perfil) || FOTO_PERFIL_PLACEHOLDER}
               alt="Fotografía de perfil"
               className="perfil-identidad-foto"
             />
@@ -718,15 +718,16 @@ function Perfil() {
             <h2>Fotografía de Perfil</h2>
             <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
               <img
-                src={previewFoto || datos?.Usuario_Foto_Perfil || FOTO_PERFIL_PLACEHOLDER}
+                src={previewFoto || resolveAssetUrl(datos?.Usuario_Foto_Perfil) || FOTO_PERFIL_PLACEHOLDER}
                 alt="Vista previa de la fotografía"
                 style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }}
               />
-              <form style={{ display: "flex", flexDirection: "column", gap: "10px" }} onSubmit={handleSubirFoto}>
+              <form style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: 0, maxWidth: "100%", flex: "1 1 200px" }} onSubmit={handleSubirFoto}>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleSeleccionArchivo}
+                  style={{ maxWidth: "100%", width: "100%" }}
                 />
                 {msgExitoFoto && <div className="msg-exito">{msgExitoFoto}</div>}
                 {msgErrorFoto && <div className="msg-error-form">{msgErrorFoto}</div>}

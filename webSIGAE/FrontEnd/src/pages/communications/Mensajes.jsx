@@ -522,13 +522,7 @@ function Mensajes() {
   // ─────────────────────────────────────────
 
   return (
-    <div
-      style={{
-        padding: '24px',
-        height: 'calc(100vh - 120px)',
-        boxSizing: 'border-box'
-      }}
-    >
+    <div className="msj-pagina">
 
       <h1 style={{ marginBottom: '20px' }}>
         Mensajes
@@ -587,14 +581,7 @@ function Mensajes() {
       )}
 
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: panelDetalleVisible
-            ? 'minmax(240px, 300px) 1fr minmax(240px, 300px)'
-            : 'minmax(260px, 320px) 1fr',
-          gap: '20px',
-          height: 'calc(100% - 70px)'
-        }}
+        className={`msj-layout${panelDetalleVisible ? ' msj-layout--detalle' : ''}`}
       >
 
         {/* ─────────────────────────────── */}

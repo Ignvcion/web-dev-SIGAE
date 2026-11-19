@@ -7,15 +7,39 @@ import {
   getHistorialCitaciones,
 } from "../../services/api";
 import {
-  CATEGORIAS_AGENDA,
   categoriaCitacion,
+  descripcionEstadoDetalle,
   esCancelada,
+  esConfirmada,
+  esPendiente,
+  fechaISO,
   formatearFecha,
   formatearFechaHora,
   ordenarCronologicamente,
+  yaPasoCitacion,
 } from "../../utils/citaciones";
 import { normalizarTexto } from "../../utils/validaciones";
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
+
+const CATEGORIAS_HISTORIAL = [
+  { clave: "todas", etiqueta: "Todos los estados" },
+  { clave: "pendiente", etiqueta: "Pendientes" },
+  { clave: "futura", etiqueta: "Futuras / Próximas" },
+  { clave: "confirmada", etiqueta: "Confirmadas" },
+  { clave: "cancelada", etiqueta: "Canceladas" },
+];
+
+const esConsistente = (c) =>
+  Boolean(c && c.Citacion_Id && /^\d{4}-\d{2}-\d{2}$/.test(fechaISO(c.Citacion_Fecha)) && c.Citacion_Estado);
+
+function tramoCitacion(c) {
+  if (c?.Citacion_Tramo_Horario) return c.Citacion_Tramo_Horario;
+  if (c?.Citacion_Hora_Inicio && c?.Citacion_Hora_Fin) {
+    return `${String(c.Citacion_Hora_Inicio).slice(0, 5)} - ${String(c.Citacion_Hora_Fin).slice(0, 5)}`;
+  }
+  if (c?.Citacion_Hora_Inicio) return String(c.Citacion_Hora_Inicio).slice(0, 5);
+  return "—";
+}
 
 // Une cada citación con sus registros de la tabla historial.
 // Acepta { citaciones: [{..., historial: []}] } o { citaciones: [], historial: [] } (plano, con Citacion_Id).
@@ -53,13 +77,28 @@ function HistorialCitaciones() {
 
   const estudianteId = searchParams.get("estudiante") || "";
 
-  const [citaciones, setCitaciones] = useState([]);
-  const [cargando, setCargando] = useState(Boolean(estudianteId));
-  const [errorCarga, setErrorCarga] = useState("");
-  const [mensajeVacio, setMensajeVacio] = useState("");
+  const [recargaKey, setRecargaKey] = useState(0);
+  const [estadoCarga, setEstadoCarga] = useState({
+    id: "",
+    recarga: 0,
+    lista: [],
+    inconsistentes: 0,
+    mensaje: "",
+    error: "",
+  });
+  const [prevEstudianteId, setPrevEstudianteId] = useState(estudianteId);
   const [filtroEstado, setFiltroEstado] = useState("todas");
+  const [busquedaCitacion, setBusquedaCitacion] = useState("");
   const [ascendente, setAscendente] = useState(false);
-  const [seleccionada, setSeleccionada] = useState(null);
+  const [seleccionState, setSeleccionState] = useState(null);
+
+  // Reinicia los filtros y la selección al cambiar de estudiante
+  if (prevEstudianteId !== estudianteId) {
+    setPrevEstudianteId(estudianteId);
+    setFiltroEstado("todas");
+    setBusquedaCitacion("");
+    setSeleccionState(null);
+  }
 
   // CU79 paso 3: estudiantes que el actor puede consultar según su rol
   useEffect(() => {
@@ -78,41 +117,54 @@ function HistorialCitaciones() {
   }, [esApoderado, usuario?.id]);
 
   // CU79 pasos 4–12: getHistorialCitaciones(Estudiante_Id)
-  const aplicarResultado = ({ lista, mensaje, error }) => {
-    setCitaciones(lista);
-    // Excepción 1: estudiante no válido o sin registros asociados
-    setMensajeVacio(!error && lista.length === 0
-      ? mensaje || "No existen citaciones registradas para el estudiante seleccionado"
-      : "");
-    // Excepción 2: error al recuperar el historial o datos inconsistentes
-    setErrorCarga(error);
-    setCargando(false);
-  };
-
   useEffect(() => {
     if (!estudianteId) return;
     let activo = true;
-    consultarHistorial(estudianteId).then((resultado) => activo && aplicarResultado(resultado));
+    consultarHistorial(estudianteId).then(({ lista, mensaje, error }) => {
+      if (!activo) return;
+      const validas = lista.filter(esConsistente);
+      const inconsistentes = lista.length - validas.length;
+      const mensajeVacio = !error && validas.length === 0
+        ? (inconsistentes > 0
+          ? "Las citaciones de este estudiante presentan datos inconsistentes."
+          : mensaje || "No existen citaciones registradas para el estudiante seleccionado")
+        : "";
+      setEstadoCarga({
+        id: estudianteId,
+        recarga: recargaKey,
+        lista: validas,
+        inconsistentes,
+        mensaje: mensajeVacio,
+        error,
+      });
+    });
     return () => { activo = false; };
-  }, [estudianteId]);
+  }, [estudianteId, recargaKey]);
 
-  const prepararCarga = () => {
-    setCargando(true);
-    setErrorCarga("");
-    setMensajeVacio("");
-    setSeleccionada(null);
-  };
+  const cargando = Boolean(estudianteId) && (estadoCarga.id !== estudianteId || estadoCarga.recarga !== recargaKey);
+  const datosActuales = estadoCarga.id === estudianteId ? estadoCarga : null;
+  const citaciones = datosActuales?.lista || [];
+  const inconsistentes = datosActuales?.inconsistentes || 0;
+  const mensajeVacio = datosActuales?.mensaje || "";
+  const errorCarga = datosActuales?.error || "";
+  const filtroActivo = filtroEstado;
+  const seleccionada = seleccionState?.estudianteId === estudianteId ? seleccionState.citacion : null;
 
   const reintentar = () => {
-    prepararCarga();
-    consultarHistorial(estudianteId).then(aplicarResultado);
+    setSeleccionState(null);
+    setRecargaKey((k) => k + 1);
   };
 
   const seleccionarEstudiante = (id) => {
     setFiltroEstado("todas");
-    if (id) prepararCarga();
+    setBusquedaCitacion("");
+    setSeleccionState(null);
     if (id) setSearchParams({ estudiante: id });
     else setSearchParams({});
+  };
+
+  const alternarFiltroEstado = (clave) => {
+    setFiltroEstado((prev) => (prev === clave ? "todas" : clave));
   };
 
   const criterio = normalizarTexto(busqueda);
@@ -125,17 +177,74 @@ function HistorialCitaciones() {
     : estudiantes;
 
   const estudianteActual = estudiantes.find((e) => String(e.Estudiante_Id) === String(estudianteId));
+  const nombreEstudianteActivo = estudianteActual?.Estudiante_Nombre_Completo || citaciones[0]?.Estudiante_Nombre_Completo || "";
+  const cursoEstudianteActivo = estudianteActual?.Curso_Nombre || citaciones[0]?.Curso_Nombre || "";
+
+  // Filtro de estado intuitivo:
+  // - "confirmada": todas las confirmadas (futuras o pasadas)
+  // - "futura": todas las próximas por realizarse (!yaPasoCitacion)
+  // - "pendiente": todas las pendientes de confirmación
+  // - "cancelada": todas las canceladas
+  const coincideEstado = (c, filtro) => {
+    if (!filtro || filtro === "todas") return true;
+    if (filtro === "pendiente") return esPendiente(c);
+    if (filtro === "futura") return !yaPasoCitacion(c);
+    if (filtro === "confirmada") return esConfirmada(c);
+    if (filtro === "cancelada") return esCancelada(c);
+    return categoriaCitacion(c) === filtro;
+  };
 
   const visibles = ordenarCronologicamente(
-    filtroEstado === "todas" ? citaciones : citaciones.filter((c) => categoriaCitacion(c) === filtroEstado),
+    citaciones.filter((c) => {
+      if (!coincideEstado(c, filtroActivo)) {
+        return false;
+      }
+      if (busquedaCitacion.trim()) {
+        const q = normalizarTexto(busquedaCitacion);
+        const docente = normalizarTexto(c.Docente_Nombre || "");
+        const motivo = normalizarTexto(c.Citacion_Motivo || "");
+        const modalidad = normalizarTexto(c.Citacion_Modalidad || "");
+        const tramo = normalizarTexto(tramoCitacion(c) || "");
+        const fecha = normalizarTexto(formatearFecha(c.Citacion_Fecha) || "");
+        const estado = normalizarTexto(c.Citacion_Estado || "");
+        const obs = normalizarTexto(c.Citacion_Observaciones_Posteriores || "");
+        const match =
+          docente.includes(q) ||
+          motivo.includes(q) ||
+          modalidad.includes(q) ||
+          tramo.includes(q) ||
+          fecha.includes(q) ||
+          estado.includes(q) ||
+          obs.includes(q);
+        if (!match) return false;
+      }
+      return true;
+    }),
     ascendente
   );
 
-  const resumen = CATEGORIAS_AGENDA.filter((c) => c.clave !== "todas").map(({ clave, etiqueta }) => ({
-    clave,
-    etiqueta,
-    total: citaciones.filter((c) => categoriaCitacion(c) === clave).length,
-  }));
+  const resumen = [
+    {
+      clave: "pendiente",
+      etiqueta: "Pendientes",
+      total: citaciones.filter(esPendiente).length,
+    },
+    {
+      clave: "futura",
+      etiqueta: "Futuras",
+      total: citaciones.filter((c) => !yaPasoCitacion(c)).length,
+    },
+    {
+      clave: "confirmada",
+      etiqueta: "Confirmadas",
+      total: citaciones.filter(esConfirmada).length,
+    },
+    {
+      clave: "cancelada",
+      etiqueta: "Canceladas",
+      total: citaciones.filter(esCancelada).length,
+    },
+  ];
 
   return (
     <div className="usuarios-container">
@@ -152,13 +261,43 @@ function HistorialCitaciones() {
       {/* Paso 3: selecciona o identifica al estudiante a consultar */}
       <div className="usuarios-filtros">
         <input
-          type="text"
+          type="search"
           className="usuarios-search"
           placeholder="Filtrar estudiantes por nombre o RUT..."
           value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setBusqueda(val);
+            const crit = normalizarTexto(val);
+            if (!crit) return;
+            const matches = estudiantes.filter(
+              (est) =>
+                normalizarTexto(est.Estudiante_Nombre_Completo || "").includes(crit) ||
+                normalizarTexto(est.Estudiante_RUT || "").includes(crit)
+            );
+            if (matches.length === 1 && String(matches[0].Estudiante_Id) !== String(estudianteId)) {
+              seleccionarEstudiante(matches[0].Estudiante_Id);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && estudiantesFiltrados.length > 0) {
+              e.preventDefault();
+              seleccionarEstudiante(estudiantesFiltrados[0].Estudiante_Id);
+            }
+          }}
           disabled={cargandoEstudiantes || estudiantes.length === 0}
+          aria-label="Filtrar estudiantes por nombre o RUT"
         />
+        {busqueda && (
+          <button
+            type="button"
+            className="btn-secondary cit-btn-limpiar"
+            onClick={() => setBusqueda("")}
+            title="Limpiar búsqueda de estudiante"
+          >
+            Limpiar
+          </button>
+        )}
         <select
           className="usuarios-select cit-select-estudiante"
           value={estudianteId}
@@ -167,15 +306,25 @@ function HistorialCitaciones() {
           aria-label="Estudiante a consultar"
         >
           <option value="">
-            {cargandoEstudiantes ? "Cargando estudiantes..." : `Selecciona un estudiante (${estudiantesFiltrados.length})`}
+            {cargandoEstudiantes
+              ? "Cargando estudiantes..."
+              : estudiantesFiltrados.length === 0
+                ? "No hay estudiantes que coincidan"
+                : `Selecciona un estudiante (${estudiantesFiltrados.length})`}
           </option>
           {/* Mantiene visible al estudiante seleccionado aunque el filtro de texto lo excluya */}
           {estudianteActual && !estudiantesFiltrados.includes(estudianteActual) && (
-            <option value={estudianteActual.Estudiante_Id}>{estudianteActual.Estudiante_Nombre_Completo}</option>
+            <option value={estudianteActual.Estudiante_Id}>
+              {estudianteActual.Estudiante_Nombre_Completo}
+              {estudianteActual.Estudiante_RUT ? ` — ${estudianteActual.Estudiante_RUT}` : ""}
+              {estudianteActual.Curso_Nombre ? ` (${estudianteActual.Curso_Nombre})` : ""}
+            </option>
           )}
           {estudiantesFiltrados.map((e) => (
             <option key={e.Estudiante_Id} value={e.Estudiante_Id}>
-              {e.Estudiante_Nombre_Completo} — {e.Estudiante_RUT}{e.Curso_Nombre ? ` (${e.Curso_Nombre})` : ""}
+              {e.Estudiante_Nombre_Completo}
+              {e.Estudiante_RUT ? ` — ${e.Estudiante_RUT}` : ""}
+              {e.Curso_Nombre ? ` (${e.Curso_Nombre})` : ""}
             </option>
           ))}
         </select>
@@ -191,6 +340,14 @@ function HistorialCitaciones() {
 
       {estudianteId && (
         <>
+          {nombreEstudianteActivo && (
+            <div className="cit-estudiante-resumen">
+              <strong>{nombreEstudianteActivo}</strong>
+              {estudianteActual?.Estudiante_RUT && <span> · {estudianteActual.Estudiante_RUT}</span>}
+              {cursoEstudianteActivo && <span> · {cursoEstudianteActivo}</span>}
+            </div>
+          )}
+
           {cargando ? (
             <p className="empty-state-text">Cargando historial...</p>
           ) : errorCarga ? (
@@ -204,40 +361,88 @@ function HistorialCitaciones() {
             <div className="usuarios-empty">{mensajeVacio}</div>
           ) : (
             <>
-              <div className="cit-resumen">
-                <div className="cit-stat">
+              {inconsistentes > 0 && (
+                <div className="error-message">
+                  {inconsistentes === 1
+                    ? "1 citación presenta datos inconsistentes y no se muestra en el historial."
+                    : `${inconsistentes} citaciones presentan datos inconsistentes y no se muestran en el historial.`}
+                </div>
+              )}
+
+              <div className="cit-resumen" role="group" aria-label="Filtro por estado de citación">
+                <button
+                  type="button"
+                  className={`cit-stat ${filtroActivo === "todas" ? "cit-stat-activo" : ""}`}
+                  onClick={() => setFiltroEstado("todas")}
+                  aria-pressed={filtroActivo === "todas"}
+                  title="Mostrar todas las citaciones"
+                >
                   <span className="cit-stat-valor">{citaciones.length}</span>
                   <span className="cit-stat-label">Total</span>
-                </div>
-                {resumen.map((r) => (
-                  <div key={r.clave} className={`cit-stat cit-stat-${r.clave}`}>
-                    <span className="cit-stat-valor">{r.total}</span>
-                    <span className="cit-stat-label">{r.etiqueta}</span>
-                  </div>
-                ))}
+                </button>
+                {resumen.map((r) => {
+                  const activa = filtroActivo === r.clave;
+                  return (
+                    <button
+                      key={r.clave}
+                      type="button"
+                      className={`cit-stat cit-stat-${r.clave} ${activa ? "cit-stat-activo" : ""}`}
+                      onClick={() => alternarFiltroEstado(r.clave)}
+                      aria-pressed={activa}
+                      title={`Filtrar por ${r.etiqueta} (${r.total})`}
+                    >
+                      <span className="cit-stat-valor">{r.total}</span>
+                      <span className="cit-stat-label">{r.etiqueta}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="cit-toolbar">
+                <input
+                  type="search"
+                  className="usuarios-search cit-search-toolbar"
+                  placeholder="Buscar en historial por motivo, docente o modalidad..."
+                  value={busquedaCitacion}
+                  onChange={(e) => setBusquedaCitacion(e.target.value)}
+                  aria-label="Buscar en historial de citaciones"
+                />
                 <select
                   className="usuarios-select cit-select-auto"
-                  value={filtroEstado}
+                  value={filtroActivo}
                   onChange={(e) => setFiltroEstado(e.target.value)}
                   aria-label="Filtrar por estado"
                 >
-                  {CATEGORIAS_AGENDA.map(({ clave, etiqueta }) => (
-                    <option key={clave} value={clave}>{clave === "todas" ? "Todos los estados" : etiqueta}</option>
+                  {CATEGORIAS_HISTORIAL.map(({ clave, etiqueta }) => (
+                    <option key={clave} value={clave}>{etiqueta}</option>
                   ))}
                 </select>
                 <button type="button" className="btn-vista" onClick={() => setAscendente((a) => !a)}>
                   {ascendente ? "Más antiguas primero ↑" : "Más recientes primero ↓"}
                 </button>
+                {(filtroActivo !== "todas" || busquedaCitacion) && (
+                  <button
+                    type="button"
+                    className="btn-secondary cit-btn-limpiar"
+                    onClick={() => {
+                      setFiltroEstado("todas");
+                      setBusquedaCitacion("");
+                    }}
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
               </div>
 
               {visibles.length === 0 ? (
-                <div className="usuarios-empty">No hay citaciones con el estado seleccionado.</div>
+                <div className="usuarios-empty">
+                  {busquedaCitacion
+                    ? `No hay citaciones que coincidan con "${busquedaCitacion}".`
+                    : "No hay citaciones con el estado seleccionado."}
+                </div>
               ) : (
-                <div className="cit-tabla-wrap">
-                  <table className="tabla-usuarios">
+                <div className="cit-tabla-wrap cit-tabla-wrap--historial">
+                  <table className="tabla-usuarios cit-tabla-historial">
                     <thead>
                       <tr>
                         <th>Fecha</th>
@@ -251,27 +456,41 @@ function HistorialCitaciones() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibles.map((c) => (
-                        <tr key={c.Citacion_Id}>
-                          <td className="cit-celda-nowrap">{formatearFecha(c.Citacion_Fecha, { corta: true })}</td>
-                          <td className="cit-celda-nowrap">{c.Citacion_Tramo_Horario}</td>
-                          <td>
-                            {c.Docente_Nombre || <span className="dato-sin-registrar">—</span>}
-                            {c.Citacion_Solicitante_Rol === "Apoderado" && <div className="cit-sub">Solicitada por el apoderado</div>}
-                          </td>
-                          <td className="cit-celda-texto">{c.Citacion_Motivo}</td>
-                          <td>{c.Citacion_Modalidad}</td>
-                          <td><EstadoCitacionBadge citacion={c} /></td>
-                          <td className="cit-celda-texto">
-                            {c.Citacion_Observaciones_Posteriores || <span className="dato-sin-registrar">Sin observaciones</span>}
-                          </td>
-                          <td className="cit-celda-nowrap">
-                            <button type="button" className="btn-roles" onClick={() => setSeleccionada(c)}>
-                              Ver detalle
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {visibles.map((c) => {
+                        const vencida = esPendiente(c) && yaPasoCitacion(c);
+                        return (
+                          <tr key={c.Citacion_Id}>
+                            <td data-label="Fecha" className="cit-celda-nowrap cit-hist-fecha">{formatearFecha(c.Citacion_Fecha, { corta: true })}</td>
+                            <td data-label="Tramo" className="cit-celda-nowrap cit-hist-tramo">{tramoCitacion(c)}</td>
+                            <td data-label="Citado por" className="cit-hist-docente">
+                              <span>
+                                {c.Docente_Nombre || <span className="dato-sin-registrar">—</span>}
+                                {c.Citacion_Solicitante_Rol === "Apoderado" && <div className="cit-sub">Solicitada por el apoderado</div>}
+                              </span>
+                            </td>
+                            <td data-label="Motivo" className="cit-celda-texto cit-hist-motivo">{c.Citacion_Motivo}</td>
+                            <td data-label="Modalidad" className="cit-hist-modalidad">{c.Citacion_Modalidad}</td>
+                            <td data-label="Estado" className="cit-hist-estado">
+                              <div>
+                                <EstadoCitacionBadge citacion={c} />
+                                {vencida && <div className="cit-sub">Horario vencido</div>}
+                              </div>
+                            </td>
+                            <td data-label="Observaciones" className="cit-celda-texto cit-hist-obs">
+                              {c.Citacion_Observaciones_Posteriores || <span className="dato-sin-registrar">Sin observaciones</span>}
+                            </td>
+                            <td className="cit-celda-nowrap cit-hist-acciones">
+                              <button
+                                type="button"
+                                className="btn-roles"
+                                onClick={() => setSeleccionState({ estudianteId, citacion: c })}
+                              >
+                                Ver detalle
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -283,7 +502,7 @@ function HistorialCitaciones() {
 
       {/* Pasos 13–14: detalle de la reunión (solo lectura) */}
       {seleccionada && (
-        <div className="modal-overlay" onClick={() => setSeleccionada(null)}>
+        <div className="modal-overlay" onClick={() => setSeleccionState(null)}>
           <div
             className="modal-card"
             role="dialog"
@@ -292,22 +511,32 @@ function HistorialCitaciones() {
           >
             <div className="modal-header">
               <h2 id="titulo-detalle-reunion">Detalle de la reunión</h2>
-              <button type="button" className="btn-cerrar" onClick={() => setSeleccionada(null)} aria-label="Cerrar">
+              <button type="button" className="btn-cerrar" onClick={() => setSeleccionState(null)} aria-label="Cerrar">
                 ✕
               </button>
             </div>
 
             <dl className="cit-detalle">
               <dt>Estado</dt>
-              <dd><EstadoCitacionBadge citacion={seleccionada} /> <span className="cit-estado-raw">{seleccionada.Citacion_Estado}</span></dd>
+              <dd>
+                <EstadoCitacionBadge citacion={seleccionada} />
+                {descripcionEstadoDetalle(seleccionada) && (
+                  <span className="cit-estado-raw">{descripcionEstadoDetalle(seleccionada)}</span>
+                )}
+              </dd>
               <dt>Fecha</dt>
               <dd>{formatearFecha(seleccionada.Citacion_Fecha)}</dd>
               <dt>Tramo horario</dt>
-              <dd>{seleccionada.Citacion_Tramo_Horario}</dd>
+              <dd>{tramoCitacion(seleccionada)}</dd>
               <dt>Modalidad</dt>
               <dd>{seleccionada.Citacion_Modalidad}</dd>
               <dt>Estudiante</dt>
-              <dd>{seleccionada.Estudiante_Nombre_Completo || estudianteActual?.Estudiante_Nombre_Completo || "—"}</dd>
+              <dd>
+                {seleccionada.Estudiante_Nombre_Completo || estudianteActual?.Estudiante_Nombre_Completo || "—"}
+                {(seleccionada.Curso_Nombre || estudianteActual?.Curso_Nombre)
+                  ? ` (${seleccionada.Curso_Nombre || estudianteActual?.Curso_Nombre})`
+                  : ""}
+              </dd>
               <dt>{seleccionada.Citacion_Solicitante_Rol === "Apoderado" ? "Docente (solicitada por el apoderado)" : "Citado por"}</dt>
               <dd>{seleccionada.Docente_Nombre || "—"}</dd>
               <dt>Apoderado</dt>
@@ -333,11 +562,11 @@ function HistorialCitaciones() {
             </dl>
 
             <h3 className="cit-subtitulo">Historial de cambios</h3>
-            {seleccionada.historial.length === 0 ? (
+            {(!seleccionada.historial || seleccionada.historial.length === 0) ? (
               <p className="empty-state-text">La citación no registra cambios de estado.</p>
             ) : (
               <ol className="cit-timeline">
-                {[...seleccionada.historial]
+                {[...(seleccionada.historial || [])]
                   .sort((a, b) =>
                     `${a.Historial_Fecha_Registro || ""} ${a.Historial_Hora_Registro || ""}`.localeCompare(
                       `${b.Historial_Fecha_Registro || ""} ${b.Historial_Hora_Registro || ""}`
@@ -348,7 +577,9 @@ function HistorialCitaciones() {
                       <div className="cit-timeline-fecha">
                         {formatearFechaHora(h.Historial_Fecha_Registro, h.Historial_Hora_Registro)}
                       </div>
-                      <div className="cit-timeline-desc">{h.Historial_Descripcion_Cambio}</div>
+                      <div className="cit-timeline-desc">
+                        {h.Historial_Descripcion_Cambio || h.Accion || "Actualización de estado"}
+                      </div>
                       {(h.Historial_Valor_Anterior || h.Historial_Valor_Nuevo) && (
                         <div className="cit-sub">
                           {h.Historial_Atributo_Modificado ? `${h.Historial_Atributo_Modificado}: ` : ""}
@@ -364,7 +595,7 @@ function HistorialCitaciones() {
             )}
 
             <div className="modal-actions" style={{ marginTop: "16px" }}>
-              <button type="button" className="btn-secondary" onClick={() => setSeleccionada(null)}>Cerrar</button>
+              <button type="button" className="btn-secondary" onClick={() => setSeleccionState(null)}>Cerrar</button>
             </div>
           </div>
         </div>

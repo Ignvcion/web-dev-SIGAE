@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getHorarioDocente, getListaDocentes, getMiHorarioAtencion, getDisponibilidadDocente, getPIEDocente } from "../../services/api";
+import { BASE_URL, getHorarioDocente, getListaDocentes, getMiHorarioAtencion, getDisponibilidadDocente, getPIEDocente } from "../../services/api";
 import { textoReparto } from "../../utils/cargaLectiva";
 import ExportMenu from "../../components/ExportMenu";
 import HorarioSemanal from "../../components/horarios/HorarioSemanal";
@@ -148,7 +148,7 @@ function MiHorario() {
           {docenteId && (
             <ExportMenu
               label="Exportar horario"
-              url={`/api/horarios/exportar/docente/${docenteId}`}
+              url={`${BASE_URL}/horarios/exportar/docente/${docenteId}`}
               filenameBase={`horario_docente_${docenteId}`}
             />
           )}

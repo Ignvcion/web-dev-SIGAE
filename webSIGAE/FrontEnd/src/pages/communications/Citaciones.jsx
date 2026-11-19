@@ -1,14 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
+import { confirmarCitacion, getCitaciones, getCitacionesPendientes, getEstudiantes } from "../../services/api";
 import {
   CATEGORIAS_AGENDA,
   categoriaCitacion,
+  esCancelada,
+  esPendiente,
   fechaISO,
   formatearFecha,
   hoyISO,
   ordenarCronologicamente,
+  puedeConfirmar,
+  yaPasoCitacion,
 } from "../../utils/citaciones";
 import EstadoCitacionBadge from "../../components/citaciones/EstadoCitacionBadge";
 import FormCitacionModal from "../../components/citaciones/FormCitacionModal";
@@ -82,10 +86,11 @@ function Citaciones() {
     setCitacionAbierta(citacionPedida);
     setDetalleIdEstado(citacionPedida);
   }
+  const [confirmandoId, setConfirmandoId] = useState(null);
 
   // CU78 pasos 1–4 (agenda) y CU75 getCitacionesPendientes(): se consultan juntas y el estado
   // se actualiza solo al recibir la respuesta
-  const aplicarResultado = ({ agenda, pendientes: pend }) => {
+  const aplicarResultado = useCallback(({ agenda, pendientes: pend }) => {
     if (agenda.error) {
       // CU78 - Excepción 2: error al recuperar la información
       setErrorCarga(agenda.error);
@@ -97,7 +102,9 @@ function Citaciones() {
       // CU78 - Excepción 1: no existen citaciones asociadas al usuario
       setMensajeVacio(validas.length === 0 ? agenda.mensaje || "No existen citaciones asociadas a tu cuenta." : "");
     }
-    const pendientesValidas = ordenarCronologicamente(pend.lista.filter(esConsistente));
+    const pendientesValidas = ordenarCronologicamente(
+      pend.lista.filter((c) => esConsistente(c) && !yaPasoCitacion(c) && puedeConfirmar(c, rolAgenda))
+    );
     setPendientes(pendientesValidas);
     // CU75 - Excepción 1: no existen citaciones pendientes
     setMsgPendientes(
@@ -107,13 +114,13 @@ function Citaciones() {
           : "")
     );
     setCargando(false);
-  };
+  }, [rolAgenda]);
 
   useEffect(() => {
     let activo = true;
     consultarCitaciones(rolAgenda).then((resultado) => activo && aplicarResultado(resultado));
     return () => { activo = false; };
-  }, [rolAgenda]);
+  }, [rolAgenda, aplicarResultado]);
 
   // Recarga tras una acción (crear, confirmar, cancelar, reprogramar) o al reintentar
   const recargar = () => {
@@ -144,6 +151,23 @@ function Citaciones() {
     setDetalleId(null);
     setMsgExito(mensaje);
     recargar();
+  };
+
+  // CU75: confirmación directa de citación pendiente desde la tarjeta de aviso
+  const handleConfirmarDirecto = async (c) => {
+    setConfirmandoId(c.Citacion_Id);
+    setErrorCarga("");
+    try {
+      const data = await confirmarCitacion(c.Citacion_Id);
+      setMsgExito(
+        data?.mensaje || "Citación confirmada correctamente. Se notificó el cambio de estado a la contraparte."
+      );
+      recargar();
+    } catch (err) {
+      setErrorCarga(err.message || "No fue posible confirmar la citación. Intente nuevamente.");
+    } finally {
+      setConfirmandoId(null);
+    }
   };
 
   const conteo = CATEGORIAS_AGENDA.reduce((acc, { clave }) => {
@@ -245,9 +269,23 @@ function Citaciones() {
                     {` · ${c.Citacion_Modalidad}`}
                   </div>
                 </div>
-                <button type="button" className="btn-reactivar" onClick={() => setDetalleId(c.Citacion_Id)}>
-                  Revisar y confirmar
-                </button>
+                <div className="cit-pendiente-acciones">
+                  <button
+                    type="button"
+                    className="btn-reactivar"
+                    onClick={() => handleConfirmarDirecto(c)}
+                    disabled={confirmandoId === c.Citacion_Id}
+                  >
+                    {confirmandoId === c.Citacion_Id ? "Confirmando..." : "Confirmar asistencia"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setDetalleId(c.Citacion_Id)}
+                  >
+                    Ver detalle
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -304,31 +342,35 @@ function Citaciones() {
                   {dia === hoy && <span className="cit-hoy">Hoy</span>}
                 </div>
                 <div className="cit-dia-items">
-                  {items.map((c) => (
-                    <button
-                      key={c.Citacion_Id}
-                      type="button"
-                      className={`cit-card cit-card-${categoriaCitacion(c)}`}
-                      onClick={() => {
-                        setMsgExito("");
-                        setDetalleId(c.Citacion_Id);
-                      }}
-                    >
-                      <div className="cit-card-tramo">{c.Citacion_Tramo_Horario}</div>
-                      <div className="cit-card-cuerpo">
-                        <div className="cit-card-titulo">
-                          {c.Estudiante_Nombre_Completo || "Estudiante sin nombre"}
-                          {c.Curso_Nombre && <span className="cit-sub"> · {c.Curso_Nombre}</span>}
+                  {items.map((c) => {
+                    const vencida = yaPasoCitacion(c) && !esCancelada(c);
+                    return (
+                      <button
+                        key={c.Citacion_Id}
+                        type="button"
+                        className={`cit-card cit-card-${categoriaCitacion(c)} ${vencida ? "cit-card-pasada" : ""}`}
+                        onClick={() => {
+                          setMsgExito("");
+                          setDetalleId(c.Citacion_Id);
+                        }}
+                      >
+                        <div className="cit-card-tramo">{c.Citacion_Tramo_Horario}</div>
+                        <div className="cit-card-cuerpo">
+                          <div className="cit-card-titulo">
+                            {c.Estudiante_Nombre_Completo || "Estudiante sin nombre"}
+                            {c.Curso_Nombre && <span className="cit-sub"> · {c.Curso_Nombre}</span>}
+                          </div>
+                          <div className="cit-sub">
+                            {participantes(c) && `${participantes(c)} · `}
+                            {c.Citacion_Modalidad}
+                            {vencida && esPendiente(c) ? " · Horario vencido" : ""}
+                          </div>
+                          <div className="cit-card-motivo">{c.Citacion_Motivo}</div>
                         </div>
-                        <div className="cit-sub">
-                          {participantes(c) && `${participantes(c)} · `}
-                          {c.Citacion_Modalidad}
-                        </div>
-                        <div className="cit-card-motivo">{c.Citacion_Motivo}</div>
-                      </div>
-                      <EstadoCitacionBadge citacion={c} />
-                    </button>
-                  ))}
+                        <EstadoCitacionBadge citacion={c} />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}

@@ -3,8 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import PanelJefaturaCurso from "../../components/cursos/PanelJefaturaCurso";
 import { getEstadoPeriodo } from "../../services/promocion";
 import { esAdministradorCompleto, puedeGestionAcademica } from "../../utils/permisos";
+import { apiUrl } from "../../services/api";
 import BarraFiltrosCursos, { tramoDelCurso, TRAMOS_CURSO } from "../../components/cursos/BarraFiltrosCursos";
-import { apiUrl } from '../../services/api';
 
 function ModalAsignarAsignaturas({ curso, token, onClose, onExito }) {
   const [disponibles, setDisponibles] = useState([]);
@@ -207,7 +207,8 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, esAdminCompleto, onVolve
           <p>Este curso no tiene asignaturas asociadas aún.</p>
         </div>
       ) : (
-        <table className="tabla-asignaturas">
+        <div className="tabla-responsive-container">
+          <table className="tabla-asignaturas">
           <thead>
             <tr>
               <th>Asignatura</th>
@@ -227,8 +228,9 @@ function PanelAsignaturasCurso({ curso, token, esAdmin, esAdminCompleto, onVolve
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {mostrarModal && (

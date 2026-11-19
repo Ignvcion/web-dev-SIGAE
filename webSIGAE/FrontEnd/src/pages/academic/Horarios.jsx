@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import useColores from "../../hooks/useColores";
 import { PuntoColor } from "../../components/SelectorColor";
 import { tonosDesdeHex } from "../../utils/colores";
@@ -8,10 +9,10 @@ import DetalleBloqueModal from "../../components/horarios/DetalleBloqueModal";
 import PanelConflictos from "../../components/horarios/PanelConflictos";
 import EtiquetaPeriodo, { textoPeriodo } from "../../components/horarios/EtiquetaPeriodo";
 import { COLOR_PENDIENTE } from "../../utils/horarios";
-import { getElectivosDeCurso, apiUrl} from '../../services/api';
+import { getElectivosDeCurso, apiUrl, BASE_URL } from "../../services/api";
 import { esAdministradorCompleto, puedeGestionAcademica, etiquetaRol } from "../../utils/permisos";
 
-const API = "/api";
+const API = BASE_URL;
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 const DIAS_ABR = ["Lun", "Mar", "Mié", "Jue", "Vie"];
 
@@ -133,6 +134,7 @@ function ClasesEliminadasMini({ clases }) {
 function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
   const { tonosAsignatura } = useColores();
   const [vistas, setVistas] = useState({});
+  const [refrescando, setRefrescando] = useState(false);
 
   useEffect(() => {
     document.body.classList.add("horarios-listado-open");
@@ -152,7 +154,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
       ]);
       const colorMap = {};
       (Array.isArray(rA) ? rA : []).forEach((a, i) => {
-        colorMap[a.Asignatura_Id] = tonosAsignatura(a.Asignatura_Id) || ASIG_COLORS[i % ASIG_COLORS.length];
+        colorMap[a.Asignatura_Id] = (tonosAsignatura && tonosAsignatura(a.Asignatura_Id)) || ASIG_COLORS[i % ASIG_COLORS.length];
       });
       setVistas(p => ({ ...p, [cursoId]: { horarios: Array.isArray(rH) ? rH : [], colorMap } }));
     } catch {
@@ -160,19 +162,109 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
     }
   };
 
+  const handleRefrescar = async () => {
+    if (refrescando) return;
+    setRefrescando(true);
+    try {
+      await onRefresh?.();
+      const cursosAbiertos = Object.keys(vistas).filter(id => vistas[id] && vistas[id] !== "loading");
+      if (cursosAbiertos.length > 0) {
+        const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+        const nuevasVistas = { ...vistas };
+        await Promise.all(cursosAbiertos.map(async (cId) => {
+          try {
+            const [rH, rA] = await Promise.all([
+              fetch(apiUrl(`/horarios?curso_id=${cId}&incluir_eliminadas=1`), { headers: h }).then(r => r.json()),
+              fetch(apiUrl(`/horarios/asignaturas-curso?curso_id=${cId}`), { headers: h }).then(r => r.json()),
+            ]);
+            const colorMap = {};
+            (Array.isArray(rA) ? rA : []).forEach((a, i) => {
+              colorMap[a.Asignatura_Id] = (tonosAsignatura && tonosAsignatura(a.Asignatura_Id)) || ASIG_COLORS[i % ASIG_COLORS.length];
+            });
+            nuevasVistas[cId] = { horarios: Array.isArray(rH) ? rH : [], colorMap };
+          } catch {
+            // mantener estado si falla petición individual
+          }
+        }));
+        setVistas(nuevasVistas);
+      }
+    } finally {
+      setRefrescando(false);
+    }
+  };
+
   return (
-    <div
-      style={{ position: "fixed", top: 0, left: 0, width: 300, height: "100vh", background: "#fff", boxShadow: "4px 0 28px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", animation: "slideInLeft 0.22s ease", zIndex: 990 }}
-    >
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className="horarios-drawer-backdrop"
+        style={{ zIndex: 1049 }}
+      />
+      <div
+        role="dialog"
+        aria-label="Listado de Cursos"
+        style={{ position: "fixed", top: 0, left: 0, width: "min(300px, 100vw)", height: "100dvh", background: "#fff", boxShadow: "4px 0 28px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "slideInLeft 0.22s ease", zIndex: 1050 }}
+      >
         {/* Header */}
-        <div style={{ background: "#0f172a", padding: "0.85rem 1.1rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "sticky", top: 0, zIndex: 1 }}>
+        <div style={{ background: "#0f172a", padding: "calc(0.85rem + env(safe-area-inset-top, 0px)) 1.1rem 0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, position: "sticky", top: 0, zIndex: 1 }}>
           <div>
             <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.88rem" }}>Listado de Cursos</div>
             <div style={{ color: "#94a3b8", fontSize: "0.68rem", marginTop: 1 }}>{cursos.length} cursos — comparación de horarios</div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onRefresh} title="Actualizar" style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#94a3b8", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center" }}>↺</button>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button
+              type="button"
+              onClick={handleRefrescar}
+              disabled={refrescando}
+              title={refrescando ? "Actualizando listado..." : "Actualizar listado"}
+              aria-label="Actualizar listado"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.22)",
+                color: refrescando ? "#60a5fa" : "#cbd5e1",
+                borderRadius: 6,
+                width: 32,
+                height: 32,
+                cursor: refrescando ? "wait" : "pointer",
+                fontSize: "0.95rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.15s ease",
+                opacity: refrescando ? 0.7 : 1,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  animation: refrescando ? "spin 0.8s linear infinite" : "none",
+                }}
+              >
+                ↺
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              title="Cerrar listado"
+              aria-label="Cerrar listado"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff",
+                borderRadius: 6,
+                width: 32,
+                height: 32,
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
 
@@ -221,6 +313,7 @@ function ListadoCursosSidebar({ cursos, bloques, onClose, onRefresh }) {
           })}
         </div>
       </div>
+    </>
   );
 }
 
@@ -263,8 +356,9 @@ export default function Horarios() {
   const [guardando, setGuardando] = useState(false);
   const [errorPanel, setErrorPanel] = useState("");
 
-  // Bulk suspend
+  // Bulk suspend / reactivate
   const [suspendiendo, setSuspendiendo] = useState(false);
+  const [confirmarAccionMasiva, setConfirmarAccionMasiva] = useState(null);
 
   // Selección múltiple de bloques (CU63 / CU64)
   const [modoSeleccion, setModoSeleccion] = useState(false);
@@ -342,20 +436,25 @@ export default function Horarios() {
     }
   }, []);
 
-  const cargarResumenCursos = useCallback(() =>
-    fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() })
-      .then(async (res) => {
-        const data = await res.json();
-        setResumenCursos(res.ok && Array.isArray(data) ? data : []);
-      })
-      .catch(() => setResumenCursos([])), []);
+  const cargarResumenCursos = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/horarios/resumen-cursos`, { headers: authHeaders() });
+      const data = await res.json();
+      const lista = res.ok && Array.isArray(data) ? data : [];
+      setResumenCursos(lista);
+      return lista;
+    } catch {
+      setResumenCursos([]);
+      return [];
+    }
+  }, []);
 
   useEffect(() => {
     if (esDocente) pedirHorarios("");
   }, [esDocente, pedirHorarios]);
 
   useEffect(() => {
-    if (listadoAbierto) cargarResumenCursos();
+    if (listadoAbierto) Promise.resolve().then(() => cargarResumenCursos());
   }, [listadoAbierto, cargarResumenCursos]);
 
   useEffect(() => {
@@ -488,16 +587,32 @@ export default function Horarios() {
 
   const handleCambiarEstado = async (id, estadoActual) => {
     const nuevoEstado = estadoActual === "Activo" ? "Suspendido" : "Activo";
+    // Actualización optimista inmediata
+    setHorarios((prev) =>
+      prev.map((h) =>
+        h.Horario_Asignatura_Id === id
+          ? { ...h, estado: nuevoEstado, Horario_Asignatura_Estado: nuevoEstado }
+          : h
+      )
+    );
     try {
-      const res = await fetch(`${API}/horarios/${id}/estado`, {
+      const res = await fetch(apiUrl(`/horarios/${id}/estado`), {
         method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+      await pedirHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
     } catch (e) {
+      // Revertir en caso de error
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.Horario_Asignatura_Id === id
+            ? { ...h, estado: estadoActual, Horario_Asignatura_Estado: estadoActual }
+            : h
+        )
+      );
       setError(e.message || "Error al cambiar estado");
     }
   };
@@ -532,28 +647,73 @@ export default function Horarios() {
     }
   };
 
-  const handleSuspenderTodo = async () => {
-    if (!window.confirm(`¿Suspender ${bloquesActivos} bloque(s) activo(s)?`)) return;
+  const handleSuspenderTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (bloquesActivos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "suspender", cantidad: bloquesActivos });
+  };
+
+  const handleReactivarTodo = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (bloquesSuspendidos <= 0) return;
+    setConfirmarAccionMasiva({ tipo: "reactivar", cantidad: bloquesSuspendidos });
+  };
+
+  const ejecutarAccionMasiva = async () => {
+    if (!confirmarAccionMasiva || suspendiendo) return;
+    const { tipo } = confirmarAccionMasiva;
     setSuspendiendo(true);
+    setError("");
     try {
-      const activos = horarios.filter((h) => h.estado === "Activo");
+      const targetEstado = tipo === "suspender" ? "Suspendido" : "Activo";
+      const sourceEstado = tipo === "suspender" ? "Activo" : "Suspendido";
+      const lista = horarios.filter((h) => h.estado === sourceEstado && !esEliminada(h));
+
+      if (lista.length === 0) {
+        setConfirmarAccionMasiva(null);
+        return;
+      }
+
+      // Actualización optimista inmediata en la interfaz: evita parpadeos y sensación de reinicio
+      setHorarios((prev) =>
+        prev.map((h) =>
+          h.estado === sourceEstado && !esEliminada(h)
+            ? { ...h, estado: targetEstado, Horario_Asignatura_Estado: targetEstado }
+            : h
+        )
+      );
+
       const resultados = await Promise.allSettled(
-        activos.map((h) =>
-          fetch(`${API}/horarios/${h.Horario_Asignatura_Id}/estado`, {
+        lista.map((h) =>
+          fetch(apiUrl(`/horarios/${h.Horario_Asignatura_Id}/estado`), {
             method: "PATCH",
             headers: authHeaders(),
-            body: JSON.stringify({ estado: "Suspendido" }),
+            body: JSON.stringify({ estado: targetEstado }),
           })
         )
       );
-      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value.ok).length;
+
+      const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value?.ok).length;
       if (fallidos > 0) {
-        setError(`No se pudieron suspender ${fallidos} de ${activos.length} bloque(s). Revisa el horario e intenta nuevamente.`);
+        setError(
+          `No se pudieron ${tipo === "suspender" ? "suspender" : "reactivar"} ${fallidos} de ${lista.length} bloque(s). Revisa el horario e intenta nuevamente.`
+        );
+      } else {
+        setExito(
+          tipo === "suspender"
+            ? `Se suspendieron correctamente los ${lista.length} bloque(s) de clases del curso.`
+            : `Se reactivaron correctamente los ${lista.length} bloque(s) de clases del curso.`
+        );
+        setTimeout(() => setExito(""), 4000);
       }
-      cargarHorarios(cursoSeleccionado);
-      cargarAsignaturas(cursoSeleccionado);
+
+      // Sincronización silenciosa en segundo plano sin desmontar la pantalla (evita setLoading(true))
+      await pedirHorarios(cursoSeleccionado);
+      await cargarAsignaturas(cursoSeleccionado);
+      setConfirmarAccionMasiva(null);
     } catch {
-      setError("Error al suspender clases.");
+      await pedirHorarios(cursoSeleccionado);
+      setError(`Error al ${tipo === "suspender" ? "suspender" : "reactivar"} las clases.`);
     } finally {
       setSuspendiendo(false);
     }
@@ -595,6 +755,7 @@ export default function Horarios() {
     return acc;
   }, {})).sort((a, b) => (!a.id) - (!b.id) || a.nombre.localeCompare(b.nombre, "es"));
   const bloquesActivos = horarios.filter((h) => h.estado === "Activo").length;
+  const bloquesSuspendidos = horarios.filter((h) => h.estado === "Suspendido" && !esEliminada(h)).length;
 
   const preview =
     panelAbierto && !modoEdicion && form.Bloque_Horario_Id && form.Horario_Asignatura_Dia_Semana
@@ -608,7 +769,7 @@ export default function Horarios() {
       : null;
 
   return (
-    <div style={s.page}>
+    <div className="horarios-page">
       {/* Header */}
       <div style={s.header}>
         <div>
@@ -727,10 +888,10 @@ export default function Horarios() {
 
       {/* Main content */}
       {(cursoSeleccionado || esDocente) && !loading && (
-        <div style={esAdmin && cursoSeleccionado ? s.mainLayout : {}}>
+        <div className={esAdmin && cursoSeleccionado ? "horarios-main-layout" : undefined}>
           {/* Left: asignatura list (admin only) */}
           {esAdmin && cursoSeleccionado && (
-            <div style={s.asigPanel}>
+            <div className="horarios-asig-panel" style={s.asigPanel}>
               <div style={s.asigPanelHead}>
                 <span style={{ fontWeight: 700, color: "#1e3a5f", fontSize: "0.9rem" }}>
                   {colorearPor === "docente" ? "Docentes" : "Asignaturas"}
@@ -837,16 +998,33 @@ export default function Horarios() {
                 </div>
               )}
 
-              {/* Bulk suspend */}
-              {bloquesActivos > 0 && (
-                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb" }}>
-                  <button
-                    style={s.btnSuspenderTodo}
-                    onClick={handleSuspenderTodo}
-                    disabled={suspendiendo}
-                  >
-                    {suspendiendo ? "Suspendiendo..." : "⚠ Suspender todas las clases"}
-                  </button>
+              {/* Bulk suspend / reactivate */}
+              {(bloquesActivos > 0 || bloquesSuspendidos > 0) && (
+                <div style={{ marginTop: "auto", padding: "0.75rem 0.5rem 0", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bloquesActivos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnSuspenderTodo}
+                      onClick={handleSuspenderTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "suspender"
+                        ? "Suspendiendo..."
+                        : `⚠ Suspender todas las clases (${bloquesActivos})`}
+                    </button>
+                  )}
+                  {bloquesSuspendidos > 0 && (
+                    <button
+                      type="button"
+                      style={s.btnReactivarTodo}
+                      onClick={handleReactivarTodo}
+                      disabled={suspendiendo}
+                    >
+                      {suspendiendo && confirmarAccionMasiva?.tipo === "reactivar"
+                        ? "Reactivando..."
+                        : `⟳ Reactivar clases suspendidas (${bloquesSuspendidos})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -908,7 +1086,7 @@ export default function Horarios() {
             {electivosCurso.length > 0 && (
               <p style={{ margin: "0 0 0.6rem", fontSize: "0.8rem", color: "#5b21b6" }}>
                 Los bloques morados son electivos de 3° y 4° medio, compartidos por todos esos cursos; se gestionan en{" "}
-                <a href="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</a>.
+                <Link to="/electivos" style={{ color: "#5b21b6", fontWeight: 700 }}>Electivos</Link>.
               </p>
             )}
             <VistaBloqueGrid
@@ -995,6 +1173,101 @@ export default function Horarios() {
         <DetalleBloqueModal horarioId={detalleBloqueId} onClose={() => setDetalleBloqueId(null)} />
       )}
 
+      {/* Modal de confirmación para suspender/reactivar todas las clases */}
+      {confirmarAccionMasiva && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "1rem",
+          }}
+          onClick={() => !suspendiendo && setConfirmarAccionMasiva(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              maxWidth: "440px",
+              width: "100%",
+              padding: "1.5rem",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <span style={{ fontSize: "1.5rem" }}>
+                {confirmarAccionMasiva.tipo === "suspender" ? "⚠️" : "🔄"}
+              </span>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#1e293b" }}>
+                {confirmarAccionMasiva.tipo === "suspender"
+                  ? "¿Suspender todas las clases?"
+                  : "¿Reactivar todas las clases?"}
+              </h3>
+            </div>
+            <p style={{ margin: "0 0 1.25rem", color: "#4b5563", fontSize: "0.88rem", lineHeight: 1.5 }}>
+              {confirmarAccionMasiva.tipo === "suspender"
+                ? `¿Confirmas que deseas suspender los ${confirmarAccionMasiva.cantidad} bloque(s) activo(s) del curso ${cursoObj?.Curso_Nombre || ""}? Las clases continuarán en el horario pero figurarán marcadas como suspendidas.`
+                : `¿Confirmas que deseas reactivar los ${confirmarAccionMasiva.cantidad} bloque(s) suspendido(s) del curso ${cursoObj?.Curso_Nombre || ""}?`}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setConfirmarAccionMasiva(null)}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "1px solid #d1d5db",
+                  background: "#ffffff",
+                  color: "#374151",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  ejecutarAccionMasiva();
+                }}
+                disabled={suspendiendo}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: confirmarAccionMasiva.tipo === "suspender" ? "#d97706" : "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: suspendiendo ? "wait" : "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                {suspendiendo && (
+                  <span style={{ display: "inline-block", animation: "spin 0.8s linear infinite" }}>↺</span>
+                )}
+                {suspendiendo
+                  ? (confirmarAccionMasiva.tipo === "suspender" ? "Suspendiendo..." : "Reactivando...")
+                  : (confirmarAccionMasiva.tipo === "suspender" ? "Sí, suspender clases" : "Sí, reactivar clases")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clases pendientes de reubicar tras redefinir la jornada o los bloques */}
       {esAdminCompleto && <PanelConflictos onCambio={alResolverConflicto} />}
 
@@ -1075,12 +1348,13 @@ function VistaBloqueGrid({
         background: "#fff",
       }}
     >
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ minWidth: 660 }}>
       {/* Header row */}
-      <div style={{ display: "flex", background: "#1e3a5f" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "130px repeat(5, minmax(0, 1fr))", background: "#1e3a5f" }}>
         <div
           style={{
-            width: 130,
-            flexShrink: 0,
+            minWidth: 0,
             padding: "0.65rem 0.75rem",
             fontSize: "0.75rem",
             fontWeight: 700,
@@ -1096,7 +1370,7 @@ function VistaBloqueGrid({
           <div
             key={d}
             style={{
-              flex: 1,
+              minWidth: 0,
               textAlign: "center",
               padding: "0.65rem 0.25rem",
               fontSize: "0.78rem",
@@ -1122,7 +1396,8 @@ function VistaBloqueGrid({
           <div
             key={bloque.Bloque_Horario_Id}
             style={{
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: "130px repeat(5, minmax(0, 1fr))",
               borderTop: bi === 0 ? "none" : "1px solid #f0f0f0",
               minHeight: 56,
             }}
@@ -1130,8 +1405,7 @@ function VistaBloqueGrid({
             {/* Block label */}
             <div
               style={{
-                width: 130,
-                flexShrink: 0,
+                minWidth: 0,
                 padding: "0.5rem 0.65rem",
                 borderRight: "1px solid #e5e7eb",
                 display: "flex",
@@ -1213,7 +1487,7 @@ function VistaBloqueGrid({
                     if (canClick) onCelda(bloque.Bloque_Horario_Id, dia);
                   }}
                   style={{
-                    flex: 1,
+                    minWidth: 0,
                     borderLeft: "1px solid " + (di === 0 ? "#e5e7eb" : "#f0f0f0"),
                     padding: "4px",
                     position: "relative",
@@ -1471,6 +1745,9 @@ function VistaBloqueGrid({
           </div>
         );
       })}
+
+      </div>
+      </div>
 
       {/* Legend */}
       <div
@@ -1743,6 +2020,12 @@ function PanelForm({
 
   return (
     <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className="horarios-drawer-backdrop"
+        style={{ zIndex: 1049 }}
+      />
       {/* Panel */}
       <div style={s.panel}>
         <div style={s.panelHeader}>
@@ -2593,7 +2876,10 @@ const s = {
     borderRadius: "6px",
     border: "1px solid #93c5fd",
     fontSize: "0.9rem",
-    minWidth: 240,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: 420,
+    flex: "1 1 220px",
   },
 
   errorBanner: {
@@ -2776,6 +3062,18 @@ const s = {
     fontSize: "0.78rem",
     textAlign: "center",
   },
+  btnReactivarTodo: {
+    width: "100%",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    color: "#1d4ed8",
+    padding: "0.4rem 0.75rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.78rem",
+    textAlign: "center",
+  },
   listadoClases: {
     marginTop: "1rem",
     border: "1px solid #e5e7eb",
@@ -2828,18 +3126,18 @@ const s = {
     position: "fixed",
     top: 0,
     right: 0,
-    width: 420,
-    height: "100vh",
+    width: "min(420px, 100vw)",
+    height: "100dvh",
     background: "#fff",
     boxShadow: "-6px 0 32px rgba(0,0,0,0.18)",
-    zIndex: 990,
+    zIndex: 1050,
     display: "flex",
     flexDirection: "column",
     animation: "slideInRight 0.22s ease",
   },
   panelHeader: {
     background: "#0f172a",
-    padding: "1rem 1.25rem",
+    padding: "calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",

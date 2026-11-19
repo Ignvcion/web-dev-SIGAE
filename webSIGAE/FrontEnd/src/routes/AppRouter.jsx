@@ -71,7 +71,7 @@ function AppRouter() {
 
   return (
 
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
 
       <Routes>
 
@@ -394,6 +394,8 @@ function AppRouter() {
           />
 
         </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
 

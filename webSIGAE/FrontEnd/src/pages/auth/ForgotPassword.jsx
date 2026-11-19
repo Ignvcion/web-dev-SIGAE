@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { validarRut, normalizarRut } from "../../utils/validaciones";
 import { CampoCodigo, AvisoDevCodigo, textoReenviar } from "../../components/CodigoVerificacion";
 import useEspera from "../../hooks/useEspera";
+import { apiUrl } from "../../services/api";
 
 // CU14: recuperar la contraseña con un código de 6 dígitos enviado desde
 // noreply@colegiojc.cl.
@@ -11,7 +12,7 @@ import useEspera from "../../hooks/useEspera";
 const ESPERA_ENTRE_ENVIOS = 60;
 
 async function postJSON(url, body) {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -63,7 +64,7 @@ function ForgotPassword() {
     const body = enmascarado
       ? { rut: rutNormalizado(), correoEnmascarado: enmascarado }
       : { rut: rutNormalizado() };
-    const { res, data } = await postJSON("/api/auth/forgot-password", body);
+    const { res, data } = await postJSON("/auth/forgot-password", body);
     if (res.status === 429 && data.segundos) {
       setEspera(data.segundos);
       throw new Error(data.error);
@@ -88,7 +89,7 @@ function ForgotPassword() {
     setLoading(true);
     setError("");
     try {
-      const { res, data } = await postJSON("/api/auth/check-recovery-emails", { rut: rutNormalizado() });
+      const { res, data } = await postJSON("/auth/check-recovery-emails", { rut: rutNormalizado() });
       if (!res.ok) throw new Error(data.error || "Error al consultar");
 
       const lista = data.correos || [];
@@ -150,7 +151,7 @@ function ForgotPassword() {
 
     setLoading(true);
     try {
-      const { res, data } = await postJSON("/api/auth/reset-password", {
+      const { res, data } = await postJSON("/auth/reset-password", {
         rut: rutNormalizado(), codigo, newPassword,
       });
       if (!res.ok) {
